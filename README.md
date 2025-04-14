@@ -1,3 +1,4 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP-samples/BPMN_evaluation_framework)](https://api.reuse.software/info/github.com/SAP-samples/BPMN_evaluation_framework)
 # SAP-samples/repository-template
 This default template for SAP Samples repositories includes files for README, LICENSE, and REUSE.toml. All repositories on github.com/SAP-samples will be created based on this template.
 
