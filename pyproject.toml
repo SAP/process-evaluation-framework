@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "BPMN_evaluation_framework"
+version = "0.1.0"
+description = ""
+authors = ["raheleh <raheleh.hadian@sap.com>"]
+readme = "README.md"
+packages = [
+    { include = "bpmn_evaluation_framework" },
+    { include = "model_evaluation" },
+]
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "primary"
+
+
+[[tool.poetry.source]]
+name = "sap"
+url = "https://int.repositories.cloud.sap/artifactory/api/pypi/build-snapshots-pypi/simple"
+priority = "supplemental"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
+ipykernel = "^6.29.5"
+scikit-learn = "^1.6.1"
+sentence-transformers = "^4.1.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
