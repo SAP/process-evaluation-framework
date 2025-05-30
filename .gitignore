@@ -138,5 +138,6 @@ conf.py
 
 # vscode
 .vscode
+Data/*
 
 poetry.lock

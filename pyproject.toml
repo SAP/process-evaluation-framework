@@ -12,12 +12,14 @@ packages = [
 [[tool.poetry.source]]
 name = "PyPI"
 priority = "primary"
+
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.11,<3.12"
 generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
 ipykernel = "^6.29.5"
 scikit-learn = "^1.6.1"
 sentence-transformers = "^4.1.0"
+pandas = "^2.2.3"
 
 [build-system]
 requires = ["poetry-core"]
