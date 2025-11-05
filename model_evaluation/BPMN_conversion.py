@@ -150,6 +150,15 @@ class BPMNConverter:
                         parent_lane=parent_lane,
                         parent_subprocess=elem["name"] or elem["id"]
                     )
+                    for a in sub_acts:
+                        if a["id"] not in {e["id"] for e in model.activities}:
+                            model.activities.append(a)
+                    for e in sub_events:
+                        if e["id"] not in {ev["id"] for ev in model.events}:
+                            model.events.append(e)
+                    for g in sub_gats:
+                        if g["id"] not in {gw["id"] for gw in model.gateways}:
+                            model.gateways.append(g)
                     # Subprocess flows (internal only)
                     sub_seq_flows = []
                     for sf in sub_flows:
@@ -311,6 +320,6 @@ class BPMNConverter:
         for collection in [model.activities, model.events, model.gateways]:
             for item in collection:
                 item.pop("parent_lane", None)
-        for act in model.activities:
-            if "parent_subprocess" in act:
-                del act["parent_subprocess"]
+        # for act in model.activities:
+        #     if "parent_subprocess" in act:
+        #         del act["parent_subprocess"]
