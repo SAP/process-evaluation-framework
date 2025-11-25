@@ -102,29 +102,6 @@ def make_similar_items_equal(list1, list2, similarity_func=bert_cosine_optimized
     return list1, list2
 
 
-# def make_similar_items_equal(list1, list2, similarity_func = bert_cosine_optimized, threshold = 0.7):
-#     """Takes two lists, makes similar items beyond a similarity threshold in list 2 identical to list 1."""
-
-#       # compute a matrix of comparisons with the similairty function
-#     comparison_matrix = {}
-
-#     for i in list1:
-#         for j in list2:
-#             if (i, j) or (j, i) not in comparison_matrix:
-#                 comparison_matrix[(i, j)] = similarity_func(i, j)
-
-#     adjusted_list2 = []
-
-#     for element in list2:
-
-#         dicted = {k[0]:v for k,v in comparison_matrix.items() if k[1] == element and v > threshold}
-
-#         if dicted:
-#             adjusted_list2.append(max(dicted, key=dicted.get))
-#         else:
-#             adjusted_list2.append(element)
-
-#     return list1, adjusted_list2
 
 
 def index_list(list):
@@ -160,3 +137,29 @@ def similarity_SFA(list1, list2, method="dice", threshold=0.7):
         return jaccard_list(list1, list2)
     elif method == "precision" or method == "recall" or method == "f1":
         return scores(list1, list2, score_type=method)
+
+
+
+# def make_similar_items_equal(list1, list2, similarity_func = bert_cosine_optimized, threshold = 0.7):
+#     """Takes two lists, makes similar items beyond a similarity threshold in list 2 identical to list 1."""
+
+#       # compute a matrix of comparisons with the similairty function
+#     comparison_matrix = {}
+
+#     for i in list1:
+#         for j in list2:
+#             if (i, j) or (j, i) not in comparison_matrix:
+#                 comparison_matrix[(i, j)] = similarity_func(i, j)
+
+#     adjusted_list2 = []
+
+#     for element in list2:
+
+#         dicted = {k[0]:v for k,v in comparison_matrix.items() if k[1] == element and v > threshold}
+
+#         if dicted:
+#             adjusted_list2.append(max(dicted, key=dicted.get))
+#         else:
+#             adjusted_list2.append(element)
+
+#     return list1, adjusted_list2
