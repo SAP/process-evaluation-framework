@@ -255,38 +255,87 @@ class BPMNConverter:
                         flow["sourceRef"] = element.get("id")
 
     @classmethod
-    def _validate_no_cross_boundary_flows(cls, model: BPMNModel):
-        """Raises an error if a flow crosses a subprocess boundary."""
-        # 1. Map from element ID to its parent subprocess (or None)
-        id2parent = {}
+    def _reorganize_subprocess_flows(cls, model: BPMNModel):
+        """Move internal subprocess flows from top-level to subprocessSequenceFlows."""
+        # Build map: element_id -> parent_subprocess_id (or None if top-level)
+        element_to_subprocess = {}
 
-        # All top-level (not in subprocess) have None
+        # Initialize all elements as top-level
         for element in model.activities + model.events + model.gateways:
-            id2parent[element["id"]] = None
+            element_to_subprocess[element["id"]] = None
 
-        # For each subprocess, label its elemRefs as belonging to that subprocess's id (or name)
+        # Map subprocess internal elements to their parent subprocess
+        subprocess_map = {}  # subprocess_id -> subprocess_dict
         for sp in model.activities:
-            if sp["type"].lower().endswith("subprocess") and "elemRefs" in sp:
-                for _id in sp["elemRefs"]:
-                    id2parent[_id] = sp["id"]
+            if sp["type"].endswith("Subprocess") and "elemRefs" in sp:
+                subprocess_map[sp["id"]] = sp
+                for elem_id in sp["elemRefs"]:
+                    element_to_subprocess[elem_id] = sp["id"]
 
-        # 2. Validate all top-level sequence flows
+        # Separate flows: internal vs top-level
+        remaining_flows = []
         for flow in model.sequence_flows:
             src = flow.get("sourceRef")
             tgt = flow.get("targetRef")
-            src_parent = src and id2parent.get(src)
-            tgt_parent = tgt and id2parent.get(tgt)
+
             if src and tgt:
-                # Allow only: both at top, or both inside the same subprocess
-                if (src_parent != tgt_parent):
+                src_parent = element_to_subprocess.get(src)
+                tgt_parent = element_to_subprocess.get(tgt)
+
+                # If both are in the same subprocess, move to subprocessSequenceFlows
+                if src_parent and src_parent == tgt_parent:
+                    subprocess = subprocess_map[src_parent]
+                    if "subprocessSequenceFlows" not in subprocess:
+                        subprocess["subprocessSequenceFlows"] = []
+                    subprocess["subprocessSequenceFlows"].append(flow)
+                else:
+                    remaining_flows.append(flow)
+            else:
+                remaining_flows.append(flow)
+
+        model.sequence_flows[:] = remaining_flows
+
+    @classmethod
+    def _validate_no_cross_boundary_flows(cls, model: BPMNModel):
+        """Raises an error if a flow crosses a subprocess boundary."""
+        # Build map: element_id -> parent_subprocess_id (or None if top-level)
+        element_to_subprocess = {}
+
+        for element in model.activities + model.events + model.gateways:
+            element_to_subprocess[element["id"]] = None
+
+        for sp in model.activities:
+            if sp["type"].endswith("Subprocess") and "elemRefs" in sp:
+                for elem_id in sp["elemRefs"]:
+                    element_to_subprocess[elem_id] = sp["id"]
+
+        # Validate top-level sequence flows (internal ones should be moved already)
+        for flow in model.sequence_flows:
+            src = flow.get("sourceRef")
+            tgt = flow.get("targetRef")
+
+            if src and tgt:
+                src_parent = element_to_subprocess.get(src)
+                tgt_parent = element_to_subprocess.get(tgt)
+
+                # One inside, one outside = boundary crossing (ERROR!)
+                if (src_parent is None and tgt_parent is not None) or \
+                   (src_parent is not None and tgt_parent is None):
                     raise ValueError(
                         f"Process structure error: Sequence flow {flow.get('id')} crosses subprocess boundary "
+                        f"(from '{src}' in subprocess '{src_parent}' to '{tgt}' in subprocess '{tgt_parent}')."
+                    )
+                # Both inside but different subprocesses = also error
+                elif src_parent and tgt_parent and src_parent != tgt_parent:
+                    raise ValueError(
+                        f"Process structure error: Sequence flow {flow.get('id')} crosses between subprocesses "
                         f"(from '{src}' in '{src_parent}' to '{tgt}' in '{tgt_parent}')."
                     )
 
     @classmethod
     def _finalize_model(cls, model: BPMNModel) -> None:
         cls._connect_flows(model)  # set sourceRef for sequence/message flows
+        cls._reorganize_subprocess_flows(model)  # move internal flows to subprocessSequenceFlows
         cls._remove_outgoing_references(model)
         cls._link_elements_to_lanes(model)
         cls._remove_parent_lane_references(model)
