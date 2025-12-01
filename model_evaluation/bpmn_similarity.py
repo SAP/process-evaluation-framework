@@ -3,329 +3,327 @@
 
 
 
-from bpmn_schema_helper import get_flows_with_values, get_lanes
-from list_similarity import similarity_SFA
+
+from list_similarity import dice_list, jaccard_list, scores, index_list
+from bpmn_sets import extract_bpmn_sets
 
 
-def weighted_score(array_of_scores_with_weights):
-    """Calculates a weighted score.
-    Takes an array like this: [{"score": 0.3, "weight": 5},{"score": 0.8, "weight": 6}]
+# def weighted_score(array_of_scores_with_weights):
+#     """Calculates a weighted score.
+#     Takes an array like this: [{"score": 0.3, "weight": 5},{"score": 0.8, "weight": 6}]
+#     """
+#     numerator, denominator = 0, 0
+#     for score_with_weight in array_of_scores_with_weights:
+#         score = score_with_weight["score"]
+#         weight = score_with_weight["weight"]
+#         numerator += score * weight
+#         denominator += weight
+
+#     if denominator == 0:
+#         return 0
+#     else:
+#         return numerator / denominator
+
+
+# def get_list(bpmn_object, sublist, attribute):
+#     """Returns a list of attributes within a sublist of a bpmn_object.
+#     For example sublist="tasks", attribute="name" returns the list of task names"""
+#     return list(
+#         map(lambda t: t[attribute], filter(lambda x: x.get(attribute), bpmn_object[sublist]))
+#     )
+
+
+
+## Set extraction now uses extract_bpmn_sets from bpmn_sets.py
+
+
+
+def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights=None):
     """
-    numerator, denominator = 0, 0
-    for score_with_weight in array_of_scores_with_weights:
-        score = score_with_weight["score"]
-        weight = score_with_weight["weight"]
-        numerator += score * weight
-        denominator += weight
+    Calculates BPMN similarity at three levels: fine, grouped, and high-level, with weighted overall score.
 
-    if denominator == 0:
-        return 0
-    else:
-        return numerator / denominator
+    Dynamically adjusts weights based on subprocess presence:
+    - If either model has expanded subprocesses: structural=35%, flows=45%, organizational=15%, subprocess=5%
+    - If no expanded subprocesses: redistributes subprocess weight proportionally
+      (structural=36.84%, flows=47.37%, organizational=15.79%, subprocess=0%)
 
+    Collapsed subprocesses are treated as regular activities and don't trigger subprocess weighting.
 
-def get_list(bpmn_object, sublist, attribute):
-    """Returns a list of attributes within a sublist of a bpmn_object.
-    For example sublist="tasks", attribute="name" returns the list of task names"""
-    return list(
-        map(lambda t: t[attribute], filter(lambda x: x.get(attribute), bpmn_object[sublist]))
-    )
-
-
-def extract_bpmn_sets(bpmn_object):
-    """Extracts various sets from a BPMN object."""
-    sets = {}
-    sets["task_names"] = get_list(bpmn_object, "tasks", "name")
-    sets["task_types"] = get_list(bpmn_object, "tasks", "type")
-    sets["event_names"] = get_list(bpmn_object, "events", "name")
-    sets["event_types"] = get_list(bpmn_object, "events", "type")
-    sets["gateway_names"] = get_list(bpmn_object, "gateways", "name")
-    sets["gateway_types"] = get_list(bpmn_object, "gateways", "type")
-
-    seq_flow_with_values, mes_flow_with_values = get_flows_with_values(bpmn_object)
-    sets["seq_flows_str"] = list(map(lambda e: " ".join(e), seq_flow_with_values))
-    sets["mes_flows_str"] = list(map(lambda e: " ".join(e), mes_flow_with_values))
-
-    lanes, lanes_with_refs = get_lanes(bpmn_object)
-    sets["lanes"] = lanes
-    sets["lanes_with_refs"] = lanes_with_refs
-
-    return sets
-
-
-def calculate_similarity_scores(
-    bpmn_object1, bpmn_object2, method="dice", similarity_threshold=0.7
-):
-    """Calculates similarity scores for two BPMN instances using dice_SFA."""
+    Returns a dict with all levels including 'weights_used' and 'has_expanded_subprocess' keys.
+    """
     sets1 = extract_bpmn_sets(bpmn_object1)
     sets2 = extract_bpmn_sets(bpmn_object2)
 
-    def safe_similarity_SFA(set1, set2, method, threshold):
-        try:
-            return similarity_SFA(set1, set2, method=method, threshold=threshold)
-        except Exception as e:
-            print(f"Error calculating similarity: {e}")
-            return 0, 0
-
-    def calculate_weighted_score(scores):
-        return weighted_score([{"score": score, "weight": weight} for score, weight in scores])
-
-    task_names_sim, task_names_n_union = safe_similarity_SFA(
-        sets1["task_names"], sets2["task_names"], method, similarity_threshold
-    )
-
-    task_types_sim, task_types_n_union = safe_similarity_SFA(
-        sets1["task_types"], sets2["task_types"], method, similarity_threshold
-    )
-
-    tasks_overall_sim = calculate_weighted_score(
-        [(task_names_sim, task_names_n_union), (task_types_sim, task_types_n_union)]
-    )
-
-    event_names_sim, event_names_n_union = safe_similarity_SFA(
-        sets1["event_names"], sets2["event_names"], method, similarity_threshold
-    )
-
-    event_types_sim, event_types_n_union = safe_similarity_SFA(
-        sets1["event_types"], sets2["event_types"], method, similarity_threshold
-    )
-
-    events_overall_sim = calculate_weighted_score(
-        [(event_names_sim, event_names_n_union), (event_types_sim, event_types_n_union)]
-    )
-
-    gateway_names_sim, gateway_names_n_union = safe_similarity_SFA(
-        sets1["gateway_names"], sets2["gateway_names"], method, similarity_threshold
-    )
-
-    gateway_types_sim, gateway_types_n_union = safe_similarity_SFA(
-        sets1["gateway_types"], sets2["gateway_types"], method, similarity_threshold
-    )
-
-    gateways_overall_sim = calculate_weighted_score(
-        [(gateway_names_sim, gateway_names_n_union), (gateway_types_sim, gateway_types_n_union)]
-    )
-
-    sequence_flows_sim, sequence_flows_n_union = safe_similarity_SFA(
-        sets1["seq_flows_str"], sets2["seq_flows_str"], method, similarity_threshold
-    )
-
-    message_flows_sim, message_flows_n_union = safe_similarity_SFA(
-        sets1["mes_flows_str"], sets2["mes_flows_str"], method, similarity_threshold
-    )
-
-    flows_overall_sim = calculate_weighted_score(
-        [(sequence_flows_sim, sequence_flows_n_union), (message_flows_sim, message_flows_n_union)]
-    )
-
-    lanes_without_refs_sim, lanes_without_refs_n_union = safe_similarity_SFA(
-        sets1["lanes"], sets2["lanes"], method, similarity_threshold
-    )
-
-    lanes_with_refs_sim, lanes_with_refs_n_union = safe_similarity_SFA(
-        sets1["lanes_with_refs"], sets2["lanes_with_refs"], method, similarity_threshold
-    )
-
-    lanes_overall_sim = calculate_weighted_score(
-        [
-            (lanes_without_refs_sim, lanes_without_refs_n_union),
-            (lanes_with_refs_sim, lanes_with_refs_n_union),
-        ]
-    )
-
-    overall = calculate_weighted_score(
-        [
-            (task_names_sim, task_names_n_union),
-            (task_types_sim, task_types_n_union),
-            (event_names_sim, event_names_n_union),
-            (event_types_sim, event_types_n_union),
-            (gateway_names_sim, gateway_names_n_union),
-            (gateway_types_sim, gateway_types_n_union),
-            (sequence_flows_sim, sequence_flows_n_union),
-            (message_flows_sim, message_flows_n_union),
-            (lanes_without_refs_sim, lanes_without_refs_n_union),
-            (lanes_with_refs_sim, lanes_with_refs_n_union),
-        ]
-    )
-
-    similarity_scores = {
-        "overall": overall,
-        "tasks_overall": tasks_overall_sim,
-        "task_names": task_names_sim,
-        "task_types": task_types_sim,
-        "events_overall": events_overall_sim,
-        "event_names": event_names_sim,
-        "event_types": event_types_sim,
-        "gateways_overall": gateways_overall_sim,
-        "gateway_names": gateway_names_sim,
-        "gateway_types": gateway_types_sim,
-        "flows_overall": flows_overall_sim,
-        "sequence_flows": sequence_flows_sim,
-        "message_flows": message_flows_sim,
-        "lanes_overall": lanes_overall_sim,
-        "lanes_without_refs": lanes_without_refs_sim,
-        "lanes_with_refs": lanes_with_refs_sim,
-    }
-    return similarity_scores, overall
-
-
-def calculate_similarity_alternative(
-    bpmn_object1, bpmn_object2, method="dice", similarity_threshold=0.7
-):
-    """Calculates similarity scores for two BPMN instances using dice_SFA."""
-    sets1 = extract_bpmn_sets(bpmn_object1)
-    sets2 = extract_bpmn_sets(bpmn_object2)
-
-    def safe_similarity_SFA(set1, set2, method, threshold):
-        try:
-            return similarity_SFA(set1, set2, method=method, threshold=threshold)
-        except Exception as e:
-            print(f"Error calculating similarity: {e}")
-            return 0, 0
-
-    def calculate_weighted_score(scores):
-        return weighted_score([{"score": score, "weight": weight} for score, weight in scores])
-
-
-    task_names_sim, weight_tn = safe_similarity_SFA(
-        sets1["task_names"], sets2["task_names"], method, similarity_threshold
-    )
-
-    if weight_tn > 0:
-        weight_tn = 1
-
-    # print(f"task_names_sim and w: {task_names_sim, weight_tn}")
-
-
-    task_types_sim, weight_tt = safe_similarity_SFA(
-        sets1["task_types"], sets2["task_types"], method, similarity_threshold
-    )
-    if weight_tt > 0:
-        weight_tt = 1
-    # print(f"task_type_sim and w: {task_types_sim, weight_tt}")
-
-
-
-    tasks_overall_sim = calculate_weighted_score(
-        [(task_names_sim, weight_tn), (task_types_sim, weight_tt)]
-    )
-
-    event_names_sim, weight_en = safe_similarity_SFA(
-        sets1["event_names"], sets2["event_names"], method, similarity_threshold
-    )
-    if weight_en > 0:
-        weight_en = 1
-
-    # print(f"eventn_sim and w: {event_names_sim, weight_en}")
-
-
-    event_types_sim, weight_et = safe_similarity_SFA(
-        sets1["event_types"], sets2["event_types"], method, similarity_threshold
-    )
-    if weight_et > 0:
-        weight_et = 1
-    # print(f"event_type_sim and w: {event_types_sim, weight_et}")
-
-
-    events_overall_sim = calculate_weighted_score(
-        [(event_names_sim, weight_en), (event_types_sim, weight_et)]
-    )
-
-    gateway_names_sim, weight_gn = safe_similarity_SFA(
-        sets1["gateway_names"], sets2["gateway_names"], method, similarity_threshold
-    )
-    if weight_gn > 0:
-        weight_gn = 1
-
-    # print(f"gnames and w: {gateway_names_sim, weight_gn}")
-
-    gateway_types_sim, weight_gt = safe_similarity_SFA(
-        sets1["gateway_types"], sets2["gateway_types"], method, similarity_threshold
-    )
-    if weight_gt > 0:
-        weight_gt = 1
-    # print(f"gntypes and w: {gateway_types_sim, weight_gt}")
-
-
-    gateways_overall_sim = calculate_weighted_score(
-        [(gateway_names_sim, weight_gn), (gateway_types_sim, weight_gt)]
-    )
-
-    sequence_flows_sim, weight_sf = safe_similarity_SFA(
-        sets1["seq_flows_str"], sets2["seq_flows_str"], method, similarity_threshold
-    )
-    if weight_sf > 0:
-        weight_sf = 1
-    # print(f"sf and w: {sequence_flows_sim, weight_sf}")
-
-    message_flows_sim, weight_mf = safe_similarity_SFA(
-        sets1["mes_flows_str"], sets2["mes_flows_str"], method, similarity_threshold
-    )
-    if weight_mf > 0:
-        weight_mf = 1
-    # print(f"mf and w: {message_flows_sim, weight_mf}")
-
-
-    flows_overall_sim = calculate_weighted_score(
-        [(sequence_flows_sim, weight_sf), (message_flows_sim, weight_mf)]
-    )
-
-    lanes_without_refs_sim, weight_l = safe_similarity_SFA(
-        sets1["lanes"], sets2["lanes"], method, similarity_threshold
-    )
-    if weight_l > 0:
-        weight_l = 1
-    # print(f"l and w: {lanes_without_refs_sim, weight_l}")
-
-    lanes_with_refs_sim, weight_lr = safe_similarity_SFA(
-        sets1["lanes_with_refs"], sets2["lanes_with_refs"], method, similarity_threshold
-    )
-    if weight_lr > 0:
-        weight_lr = 1
-    # print(f"lr and w: {lanes_with_refs_sim, weight_lr}")
-
-
-    lanes_overall_sim = calculate_weighted_score(
-        [
-            (lanes_without_refs_sim, weight_l),
-            (lanes_with_refs_sim, weight_lr),
-        ]
-    )
-
-    def calulate_overall_score():
-
-        node_count = 0
-        if weight_en + weight_et > 0:
-            node_count += 1
-        if weight_tn + weight_tt > 0:
-            node_count += 1
-        if weight_gn + weight_gt > 0:
-            node_count += 1
-        if weight_l + weight_lr > 0:
-            node_count += 1
-        if node_count == 0:
-            overall = 0
+    # Level 1: Fine-grained
+    fine_scores = {}
+    for key in [
+        "activity_names", "activity_types", "event_names", "event_types",
+        "gateway_names", "gateway_types", "seq_flows_str", "mes_flows_str",
+        "lane_names", "lane_with_refs", "subprocess_names", "subprocess_elemrefs", "subprocess_flows"
+    ]:
+        l1 = index_list(sets1.get(key, []))
+        l2 = index_list(sets2.get(key, []))
+        if method == "dice":
+            fine_scores[key] = dice_list(l1, l2)[0]
+        elif method == "jaccard":
+            fine_scores[key] = jaccard_list(l1, l2)[0]
+        elif method in {"precision", "recall", "f1"}:
+            fine_scores[key] = scores(l1, l2, score_type=method)[0]
         else:
-            overall = 0.5 * (flows_overall_sim) + 0.5/node_count * tasks_overall_sim + \
-            0.5/node_count * events_overall_sim + 0.5/node_count * gateways_overall_sim + \
-            0.5/node_count * lanes_overall_sim
+            raise ValueError("Unsupported method")
 
-        return overall
-
-
-
-    similarity_scores = {
-        "overall": calulate_overall_score(),
-
-        "tasks_overall": tasks_overall_sim,
-
-        "events_overall": events_overall_sim,
-
-        "gateways_overall": gateways_overall_sim,
-
-        "flows_overall": flows_overall_sim,
-
-        "lanes_overall": lanes_overall_sim,
-
+    # Level 2: Grouped
+    grouped_scores = {
+        "activities": (fine_scores["activity_names"] + fine_scores["activity_types"]) / 2,
+        "events": (fine_scores["event_names"] + fine_scores["event_types"]) / 2,
+        "gateways": (fine_scores["gateway_names"] + fine_scores["gateway_types"]) / 2,
+        "flows": (fine_scores["seq_flows_str"] + fine_scores["mes_flows_str"]) / 2,
+        "pools": (fine_scores["lane_names"] + fine_scores["lane_with_refs"]) / 2,
+        "subprocess": (
+            fine_scores["subprocess_names"] * 0.2 +      # 20% - subprocess identity
+            fine_scores["subprocess_elemrefs"] * 0.3 +   # 30% - element containment
+            fine_scores["subprocess_flows"] * 0.5        # 50% - flow structure (most important)
+        ),
     }
-    return similarity_scores
+
+    # Level 3: High-level
+    # Check if either model has expanded subprocesses
+    has_expanded_subprocess = (
+        len(sets1.get("subprocess_names", [])) > 0 or
+        len(sets2.get("subprocess_names", [])) > 0
+    )
+
+    # Default weights if not provided
+    if has_expanded_subprocess:
+        # Standard weights when subprocesses are present
+        default_weights = {
+            "structural": 0.3,
+            "flows": 0.5,
+            "organizational": 0.15,
+            "subprocess": 0.05
+        }
+    else:
+        # Redistribute subprocess weight proportionally when no expanded subprocesses
+        # Original: structural=0.35, flows=0.45, organizational=0.15, subprocess=0.05
+        # Without subprocess: redistribute 0.05 proportionally to other 3 (total 0.95)
+        # structural: 0.35/0.95 = 0.3684, flows: 0.45/0.95 = 0.4737, org: 0.15/0.95 = 0.1579
+        default_weights = {
+            "structural": 0.3,
+            "flows": 0.5,
+            "organizational": 0.2,
+            "subprocess": 0.0
+        }
+
+    if weights is not None:
+        # Validate weights
+        expected_keys = set(default_weights.keys())
+        provided_keys = set(weights.keys())
+        if expected_keys != provided_keys:
+            raise ValueError(
+                f"Weights must have exactly these keys: {expected_keys}. Got: {provided_keys}"
+            )
+        weight_sum = sum(weights.values())
+        if not (0.99 <= weight_sum <= 1.01):  # Allow small floating point tolerance
+            raise ValueError(
+                f"Weights must sum to 1.0 (100%). Got sum: {weight_sum}"
+            )
+        for k in default_weights:
+            if k in weights:
+                default_weights[k] = weights[k]
+
+    high_level_scores = {
+        "structural": (grouped_scores["activities"] + grouped_scores["events"] + grouped_scores["gateways"]) / 3,
+        "flows": grouped_scores["flows"],
+        "organizational": grouped_scores["pools"],
+        "subprocess": grouped_scores["subprocess"]
+    }
+
+    # Weighted overall score
+    total_weight = sum(default_weights.values())
+    overall = sum(high_level_scores[k] * default_weights[k] for k in high_level_scores) / total_weight
+
+    # Build comprehensive result dict with both nested and flat access patterns
+    result = {
+        # Nested structure
+        "fine_scores": fine_scores,
+        "grouped_scores": grouped_scores,
+        "high_level_scores": high_level_scores,
+        "overall": overall,
+        "weights_used": default_weights,
+        "has_expanded_subprocess": has_expanded_subprocess
+    }
+
+    # Add flat access for convenience (backward compatibility)
+    # Fine-grained scores with original keys
+    for key, value in fine_scores.items():
+        result[key] = value
+
+    # Grouped scores with _grouped suffix
+    result["structural_grouped"] = high_level_scores["structural"]
+    result["flow_grouped"] = high_level_scores["flows"]
+    result["organizational_grouped"] = high_level_scores["organizational"]
+    result["subprocess_grouped"] = high_level_scores["subprocess"]
+
+    return result
+
+
+# def calculate_similarity_alternative(
+#     bpmn_object1, bpmn_object2, method="dice", similarity_threshold=0.7
+# ):
+#     """Calculates similarity scores for two BPMN instances using dice_SFA."""
+#     sets1 = extract_bpmn_sets(bpmn_object1)
+#     sets2 = extract_bpmn_sets(bpmn_object2)
+
+#     def safe_similarity_SFA(set1, set2, method, threshold):
+#         try:
+#             return similarity_SFA(set1, set2, method=method, threshold=threshold)
+#         except Exception as e:
+#             print(f"Error calculating similarity: {e}")
+#             return 0, 0
+
+#     def calculate_weighted_score(scores):
+#         return weighted_score([{"score": score, "weight": weight} for score, weight in scores])
+
+
+#     task_names_sim, weight_tn = safe_similarity_SFA(
+#         sets1["task_names"], sets2["task_names"], method, similarity_threshold
+#     )
+
+#     if weight_tn > 0:
+#         weight_tn = 1
+
+#     # print(f"task_names_sim and w: {task_names_sim, weight_tn}")
+
+
+#     task_types_sim, weight_tt = safe_similarity_SFA(
+#         sets1["task_types"], sets2["task_types"], method, similarity_threshold
+#     )
+#     if weight_tt > 0:
+#         weight_tt = 1
+#     # print(f"task_type_sim and w: {task_types_sim, weight_tt}")
+
+
+
+#     tasks_overall_sim = calculate_weighted_score(
+#         [(task_names_sim, weight_tn), (task_types_sim, weight_tt)]
+#     )
+
+#     event_names_sim, weight_en = safe_similarity_SFA(
+#         sets1["event_names"], sets2["event_names"], method, similarity_threshold
+#     )
+#     if weight_en > 0:
+#         weight_en = 1
+
+#     # print(f"eventn_sim and w: {event_names_sim, weight_en}")
+
+
+#     event_types_sim, weight_et = safe_similarity_SFA(
+#         sets1["event_types"], sets2["event_types"], method, similarity_threshold
+#     )
+#     if weight_et > 0:
+#         weight_et = 1
+#     # print(f"event_type_sim and w: {event_types_sim, weight_et}")
+
+
+#     events_overall_sim = calculate_weighted_score(
+#         [(event_names_sim, weight_en), (event_types_sim, weight_et)]
+#     )
+
+#     gateway_names_sim, weight_gn = safe_similarity_SFA(
+#         sets1["gateway_names"], sets2["gateway_names"], method, similarity_threshold
+#     )
+#     if weight_gn > 0:
+#         weight_gn = 1
+
+#     # print(f"gnames and w: {gateway_names_sim, weight_gn}")
+
+#     gateway_types_sim, weight_gt = safe_similarity_SFA(
+#         sets1["gateway_types"], sets2["gateway_types"], method, similarity_threshold
+#     )
+#     if weight_gt > 0:
+#         weight_gt = 1
+#     # print(f"gntypes and w: {gateway_types_sim, weight_gt}")
+
+
+#     gateways_overall_sim = calculate_weighted_score(
+#         [(gateway_names_sim, weight_gn), (gateway_types_sim, weight_gt)]
+#     )
+
+#     sequence_flows_sim, weight_sf = safe_similarity_SFA(
+#         sets1["seq_flows_str"], sets2["seq_flows_str"], method, similarity_threshold
+#     )
+#     if weight_sf > 0:
+#         weight_sf = 1
+#     # print(f"sf and w: {sequence_flows_sim, weight_sf}")
+
+#     message_flows_sim, weight_mf = safe_similarity_SFA(
+#         sets1["mes_flows_str"], sets2["mes_flows_str"], method, similarity_threshold
+#     )
+#     if weight_mf > 0:
+#         weight_mf = 1
+#     # print(f"mf and w: {message_flows_sim, weight_mf}")
+
+
+#     flows_overall_sim = calculate_weighted_score(
+#         [(sequence_flows_sim, weight_sf), (message_flows_sim, weight_mf)]
+#     )
+
+#     lanes_without_refs_sim, weight_l = safe_similarity_SFA(
+#         sets1["lanes"], sets2["lanes"], method, similarity_threshold
+#     )
+#     if weight_l > 0:
+#         weight_l = 1
+#     # print(f"l and w: {lanes_without_refs_sim, weight_l}")
+
+#     lanes_with_refs_sim, weight_lr = safe_similarity_SFA(
+#         sets1["lanes_with_refs"], sets2["lanes_with_refs"], method, similarity_threshold
+#     )
+#     if weight_lr > 0:
+#         weight_lr = 1
+#     # print(f"lr and w: {lanes_with_refs_sim, weight_lr}")
+
+
+#     lanes_overall_sim = calculate_weighted_score(
+#         [
+#             (lanes_without_refs_sim, weight_l),
+#             (lanes_with_refs_sim, weight_lr),
+#         ]
+#     )
+
+#     def calulate_overall_score():
+
+#         node_count = 0
+#         if weight_en + weight_et > 0:
+#             node_count += 1
+#         if weight_tn + weight_tt > 0:
+#             node_count += 1
+#         if weight_gn + weight_gt > 0:
+#             node_count += 1
+#         if weight_l + weight_lr > 0:
+#             node_count += 1
+#         if node_count == 0:
+#             overall = 0
+#         else:
+#             overall = 0.5 * (flows_overall_sim) + 0.5/node_count * tasks_overall_sim + \
+#             0.5/node_count * events_overall_sim + 0.5/node_count * gateways_overall_sim + \
+#             0.5/node_count * lanes_overall_sim
+
+#         return overall
+
+
+
+#     similarity_scores = {
+#         "overall": calulate_overall_score(),
+
+#         "tasks_overall": tasks_overall_sim,
+
+#         "events_overall": events_overall_sim,
+
+#         "gateways_overall": gateways_overall_sim,
+
+#         "flows_overall": flows_overall_sim,
+
+#         "lanes_overall": lanes_overall_sim,
+
+#     }
+#     return similarity_scores

@@ -34,6 +34,8 @@ sentence-transformers = "^4.1.0"
 pandas = "^2.2.3"
 signavio-authentication = {version = "^1.4.9", source = "signavio"}
 signavio = {version = "^2.8.3", source = "signavio"}
+ipywidgets = "^8.1.8"
+matplotlib = "^3.10.7"
 
 
 [build-system]
