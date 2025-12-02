@@ -1,0 +1,211 @@
+{
+    "resourceId": "canvas",
+    "properties": {
+        "documentation_en_gb": "Booking flight tickets - variant process\nIn a travel booking scenario, a traveler submits a flight request to a travel consultant after completing trip planning. The consultant contacts multiple airlines and sends quote requests for the desired route.\n\nThe consultant waits up to 3 minutes for airline responses. After receiving offers, the consultant compares prices and selects the best option. The consultant then requests ticket reservation from the chosen airline. Upon receiving confirmation, the consultant creates an itinerary for the traveler and sends it. The traveler gets electronic tickets from the airline directly.\n\nNote: Airline internal workflows are not shown.",
+        "language": "English",
+        "orientation": "horizontal",
+        "meta-vertraulichkeit_en_gb": "Nur für den internen Gebrauch",
+        "meta-modelingstatus": "Draft"
+    },
+    "stencil": { "id": "BPMNDiagram" },
+    "childShapes": [
+        {
+            "resourceId": "PoolCustomer",
+            "properties": { "name": "Traveler" },
+            "stencil": { "id": "Pool" },
+            "childShapes": [
+                {
+                    "resourceId": "LaneCustomer",
+                    "stencil": { "id": "Lane" },
+                    "childShapes": [
+                        {
+                            "resourceId": "StartEvent1",
+                            "stencil": { "id": "StartNoneEvent" },
+                            "properties": { "name": "Trip planning completed" },
+                            "outgoing": [{ "resourceId": "Flow1" }]
+                        },
+                        {
+                            "resourceId": "Task1",
+                            "stencil": { "id": "Task" },
+                            "properties": { "name": "Submit flight request" },
+                            "outgoing": [{ "resourceId": "Flow2" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent1",
+                            "stencil": { "id": "IntermediateMessageEventThrowing" },
+                            "properties": { "name": "Send request" },
+                            "outgoing": [{ "resourceId": "MessageFlow1" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent2",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Receive itinerary" },
+                            "outgoing": [{ "resourceId": "Flow10" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent3",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Receive e-tickets" },
+                            "outgoing": [{ "resourceId": "Flow11" }]
+                        },
+                        {
+                            "resourceId": "EndEvent1",
+                            "stencil": { "id": "EndNoneEvent" },
+                            "properties": { "name": "Booking complete" }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "resourceId": "PoolAgency",
+            "properties": { "name": "Travel Consultant" },
+            "stencil": { "id": "Pool" },
+            "childShapes": [
+                {
+                    "resourceId": "LaneAgency",
+                    "stencil": { "id": "Lane" },
+                    "childShapes": [
+                        {
+                            "resourceId": "MessageEvent4",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Receive request" },
+                            "outgoing": [{ "resourceId": "Flow3" }]
+                        },
+                        {
+                            "resourceId": "SubprocessQuotes",
+                            "stencil": { "id": "Subprocess" },
+                            "properties": { "name": "Request flight quotes" },
+                            "outgoing": [{ "resourceId": "Flow4" }],
+                            "childShapes": [
+                                {
+                                    "resourceId": "SubStart1",
+                                    "stencil": { "id": "StartNoneEvent" },
+                                    "properties": { "name": "" },
+                                    "outgoing": [{ "resourceId": "SubFlow1" }]
+                                },
+                                {
+                                    "resourceId": "SubTask1",
+                                    "stencil": { "id": "Task" },
+                                    "properties": { "name": "Prepare quote request" },
+                                    "outgoing": [{ "resourceId": "SubFlow2" }]
+                                },
+                                {
+                                    "resourceId": "SubMessage1",
+                                    "stencil": { "id": "IntermediateMessageEventThrowing" },
+                                    "properties": { "name": "Send to airlines" },
+                                    "outgoing": [{ "resourceId": "MessageFlow2" }, { "resourceId": "SubFlow3" }]
+                                },
+                                {
+                                    "resourceId": "SubTimer1",
+                                    "stencil": { "id": "IntermediateTimerEvent" },
+                                    "properties": { "name": "Wait 3 min" },
+                                    "outgoing": [{ "resourceId": "SubFlow4" }]
+                                },
+                                {
+                                    "resourceId": "SubMessage2",
+                                    "stencil": { "id": "IntermediateMessageEventCatching" },
+                                    "properties": { "name": "Collect responses" },
+                                    "outgoing": [{ "resourceId": "SubFlow5" }]
+                                },
+                                {
+                                    "resourceId": "SubEnd1",
+                                    "stencil": { "id": "EndNoneEvent" },
+                                    "properties": { "name": "" }
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "Task2",
+                            "stencil": { "id": "Task" },
+                            "properties": { "name": "Compare airline offers" },
+                            "outgoing": [{ "resourceId": "Flow5" }]
+                        },
+                        {
+                            "resourceId": "Task3",
+                            "stencil": { "id": "Task" },
+                            "properties": { "name": "Select best offer" },
+                            "outgoing": [{ "resourceId": "Flow6" }]
+                        },
+                        {
+                            "resourceId": "Task4",
+                            "stencil": { "id": "Task" },
+                            "properties": { "name": "Request ticket reservation" },
+                            "outgoing": [{ "resourceId": "Flow7" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent5",
+                            "stencil": { "id": "IntermediateMessageEventThrowing" },
+                            "properties": { "name": "Send reservation request" },
+                            "outgoing": [{ "resourceId": "MessageFlow3" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent6",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Get confirmation" },
+                            "outgoing": [{ "resourceId": "Flow8" }]
+                        },
+                        {
+                            "resourceId": "Task5",
+                            "stencil": { "id": "Task" },
+                            "properties": { "name": "Create travel itinerary" },
+                            "outgoing": [{ "resourceId": "Flow9" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent7",
+                            "stencil": { "id": "IntermediateMessageEventThrowing" },
+                            "properties": { "name": "Send itinerary" },
+                            "outgoing": [{ "resourceId": "MessageFlow4" }]
+                        },
+                        {
+                            "resourceId": "EndEvent2",
+                            "stencil": { "id": "EndNoneEvent" },
+                            "properties": { "name": "Process completed" }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "resourceId": "PoolAirline",
+            "properties": { "name": "Airlines" },
+            "stencil": { "id": "Pool" },
+            "childShapes": [
+                {
+                    "resourceId": "LaneAirline",
+                    "stencil": { "id": "Lane" },
+                    "childShapes": [
+                        {
+                            "resourceId": "MessageEvent8",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Receive quote request" },
+                            "outgoing": [{ "resourceId": "Flow12" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent9",
+                            "stencil": { "id": "IntermediateMessageEventCatching" },
+                            "properties": { "name": "Receive reservation request" },
+                            "outgoing": [{ "resourceId": "Flow13" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent10",
+                            "stencil": { "id": "IntermediateMessageEventThrowing" },
+                            "properties": { "name": "Send confirmation" },
+                            "outgoing": [{ "resourceId": "MessageFlow5" }]
+                        },
+                        {
+                            "resourceId": "MessageEvent11",
+                            "stencil": { "id": "IntermediateMessageEventThrowing" },
+                            "properties": { "name": "Send e-tickets" },
+                            "outgoing": [{ "resourceId": "MessageFlow6" }]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "stencilset": {
+        "url": "http://b3mn.org/stencilset/bpmn2.0#",
+        "namespace": "http://b3mn.org/stencilset/bpmn2.0#"
+    }
+}
