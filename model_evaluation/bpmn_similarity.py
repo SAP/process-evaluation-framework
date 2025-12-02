@@ -88,9 +88,14 @@ def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights
 
     # Level 3: High-level
     # Check if either model has expanded subprocesses
+    # Check both names and elements to catch subprocesses without names
     has_expanded_subprocess = (
         len(sets1.get("subprocess_names", [])) > 0 or
-        len(sets2.get("subprocess_names", [])) > 0
+        len(sets2.get("subprocess_names", [])) > 0 or
+        len(sets1.get("subprocess_elemrefs", [])) > 0 or
+        len(sets2.get("subprocess_elemrefs", [])) > 0 or
+        len(sets1.get("subprocess_flows", [])) > 0 or
+        len(sets2.get("subprocess_flows", [])) > 0
     )
 
     # Default weights if not provided
