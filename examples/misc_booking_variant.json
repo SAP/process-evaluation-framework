@@ -1,0 +1,1969 @@
+{
+    "resourceId": "canvas",
+    "properties": {
+        "documentation_en_gb": "Hotel Room Booking\nIn a hotel booking scenario, a guest sends a booking request to a booking agency after researching destinations. The agency is in contact with multiple hotel chains.\n\nThe agency sends availability requests to all partner hotels and waits at most 5 minutes for offers. The agency then checks if rooms are available. If yes, it selects the best offer and confirms the booking. The hotel sends an invoice directly to the guest.\n\nNote: The internal process of the hotels should not be displayed.\n",
+        "documentation": "Hotel Room Booking\nIn a hotel booking scenario, a guest sends a booking request to a booking agency after researching destinations. The agency is in contact with multiple hotel chains.\n\nThe agency sends availability requests to all partner hotels and waits at most 5 minutes for offers. The agency then checks if rooms are available. If yes, it selects the best offer and confirms the booking. The hotel sends an invoice directly to the guest.\n\nNote: The internal process of the hotels should not be displayed.\n",
+        "language": "English",
+        "targetnamespace": "http://www.signavio.com/bpmn20",
+        "expressionlanguage": "http://www.w3.org/1999/XPath",
+        "typelanguage": "http://www.w3.org/2001/XMLSchema",
+        "orientation": "horizontal",
+        "processtype": "None",
+        "meta-modelingstatus": "Draft",
+        "generalprocessstatus": "InProcess"
+    },
+    "stencil": {
+        "id": "BPMNDiagram"
+    },
+    "childShapes": [
+        {
+            "resourceId": "sid-7742D64A-6081-F2E0-EC8A-0470BE4B7FC2",
+            "properties": {
+                "name_en_gb": "Guest",
+                "name": "Guest",
+                "name_de_de": "Gast",
+                "documentation_en_gb": "",
+                "bgcolor": "#ffffff",
+                "bordercolor": "#000000",
+                "processid": "Process_sid-7742D64A-6081-F2"
+            },
+            "stencil": {
+                "id": "Pool"
+            },
+            "childShapes": [
+                {
+                    "resourceId": "sid-ACC50172-B53D-2B24-5215-25B6D1C40DD9",
+                    "properties": {
+                        "name_en_gb": ""
+                    },
+                    "stencil": {
+                        "id": "Lane"
+                    },
+                    "childShapes": [
+                        {
+                            "resourceId": "sid-DF854916-A57C-9F4D-BE61-115B293052EF",
+                            "properties": {
+                                "name_en_gb": "Vacation idea",
+                                "name": "Vacation idea",
+                                "name_de_de": "Urlaubsidee",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "None"
+                            },
+                            "stencil": {
+                                "id": "StartNoneEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-9F6DFCCD-D87E-B2B1-9FA8-F8CCE2EF8410"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 72,
+                                    "y": 105
+                                },
+                                "upperLeft": {
+                                    "x": 42,
+                                    "y": 75
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-822F6D23-C245-7AF7-4E2C-BFFF34D73EF3",
+                            "properties": {
+                                "name_en_gb": "Research destinations",
+                                "name": "Research destinations",
+                                "name_de_de": "Reiseziele recherchieren",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": true,
+                                "tasktype": "None",
+                                "bgcolor": "#FFFFFF",
+                                "bordercolor": "#000000",
+                                "looptype": "None",
+                                "categories": "",
+                                "startquantity": "1",
+                                "completionquantity": "1",
+                                "isforcompensation": "",
+                                "implementation": "webService"
+                            },
+                            "stencil": {
+                                "id": "Task"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-67AE6ACB-247E-814B-6EC9-1464D2C0A015"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 230,
+                                    "y": 130
+                                },
+                                "upperLeft": {
+                                    "x": 130,
+                                    "y": 50
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-35319F88-C1CB-B755-DE65-0C956F81AB53",
+                            "properties": {
+                                "name_en_gb": "Send booking\nrequest",
+                                "name": "Send booking\nrequest",
+                                "name_de_de": "Buchungsanfrage\nsenden",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "IntermediateMessageEventThrowing"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-02A16D70-61F2-530E-4021-68D427126C72"
+                                },
+                                {
+                                    "resourceId": "sid-DE54B688-89E1-4AA0-EAA8-68ADA28F92EF"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 330,
+                                    "y": 105
+                                },
+                                "upperLeft": {
+                                    "x": 300,
+                                    "y": 75
+                                }
+                            },
+                            "dockers": [
+                                {
+                                    "x": 315,
+                                    "y": 90
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "sid-773379C4-CF30-EBFD-A637-C1AA41CA13EC",
+                            "properties": {
+                                "name_en_gb": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "gatewaytype": "AND"
+                            },
+                            "stencil": {
+                                "id": "ParallelGateway"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-A86AEC1E-A30B-E55E-C122-98B5C89AD82A"
+                                },
+                                {
+                                    "resourceId": "sid-B80DFDCF-C33B-1CA0-8829-9F6F5C860CDF"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 980,
+                                    "y": 110
+                                },
+                                "upperLeft": {
+                                    "x": 940,
+                                    "y": 70
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-11CC74E4-87AD-6CBC-B9EB-8E0454866633",
+                            "properties": {
+                                "name_en_gb": "Receive\nconfirmation",
+                                "name": "Receive\nconfirmation",
+                                "name_de_de": "Best\u00e4tigung\nerhalten",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "IntermediateMessageEventCatching"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-6AEC0054-D775-814E-99E2-BA1FAB1D74F2"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1100,
+                                    "y": 60
+                                },
+                                "upperLeft": {
+                                    "x": 1070,
+                                    "y": 30
+                                }
+                            },
+                            "dockers": [
+                                {
+                                    "x": 1085,
+                                    "y": 45
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "sid-C091A0F8-FC7E-FB4F-BADC-DC693D440823",
+                            "properties": {
+                                "name_en_gb": "Receive\ninvoice",
+                                "name": "Receive\ninvoice",
+                                "name_de_de": "Rechnung\nerhalten",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "IntermediateMessageEventCatching"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-106AB701-0116-E635-EA1C-D118B74C2557"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1100,
+                                    "y": 150
+                                },
+                                "upperLeft": {
+                                    "x": 1070,
+                                    "y": 120
+                                }
+                            },
+                            "dockers": [
+                                {
+                                    "x": 1085,
+                                    "y": 135
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "sid-F9A28C49-EF68-0931-AC67-348870393838",
+                            "properties": {
+                                "name_en_gb": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "gatewaytype": "AND"
+                            },
+                            "stencil": {
+                                "id": "ParallelGateway"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-5D817128-7180-59E8-3FCA-39CEBF4AD7AD"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1230,
+                                    "y": 110
+                                },
+                                "upperLeft": {
+                                    "x": 1190,
+                                    "y": 70
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-4C75A852-D120-5CF3-CBBC-1AC26A77EB12",
+                            "properties": {
+                                "name_en_gb": "Ready to\ntravel",
+                                "name": "Ready to\ntravel",
+                                "name_de_de": "Reisebereit",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "None"
+                            },
+                            "stencil": {
+                                "id": "EndNoneEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1340,
+                                    "y": 104
+                                },
+                                "upperLeft": {
+                                    "x": 1312,
+                                    "y": 76
+                                }
+                            },
+                            "dockers": []
+                        }
+                    ],
+                    "outgoing": [],
+                    "bounds": {
+                        "lowerRight": {
+                            "x": 1440,
+                            "y": 175
+                        },
+                        "upperLeft": {
+                            "x": 30,
+                            "y": 0
+                        }
+                    },
+                    "dockers": []
+                }
+            ],
+            "outgoing": [],
+            "bounds": {
+                "lowerRight": {
+                    "x": 1500,
+                    "y": 200
+                },
+                "upperLeft": {
+                    "x": 30,
+                    "y": 25
+                }
+            },
+            "dockers": []
+        },
+        {
+            "resourceId": "sid-CC8127D4-EF7A-7862-374D-F63C5D5ECF67",
+            "properties": {
+                "name_en_gb": "Booking Agency",
+                "name": "Booking Agency",
+                "name_de_de": "Buchungsagentur",
+                "documentation_en_gb": "",
+                "bgcolor": "#ffffff",
+                "bordercolor": "#000000",
+                "processid": "Process_sid-CC8127D4-EF7A-78"
+            },
+            "stencil": {
+                "id": "Pool"
+            },
+            "childShapes": [
+                {
+                    "resourceId": "sid-648E54DB-58C3-47E1-8A99-9AB688B479D4",
+                    "properties": {
+                        "name_en_gb": ""
+                    },
+                    "stencil": {
+                        "id": "Lane"
+                    },
+                    "childShapes": [
+                        {
+                            "resourceId": "sid-2B89A0E5-CD97-A2BA-9D44-76517AE15414",
+                            "properties": {
+                                "name_en_gb": "Booking request\nreceived",
+                                "name": "Booking request\nreceived",
+                                "name_de_de": "Buchungsanfrage\nerhalten",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "StartMessageEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-BAEBAA98-BF2C-3FB2-19A4-725BFA297059"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 320,
+                                    "y": 80
+                                },
+                                "upperLeft": {
+                                    "x": 290,
+                                    "y": 50
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-19BB4815-6EDD-2382-DC0E-3A94CF30BCC1",
+                            "properties": {
+                                "name_en_gb": "Partner hotels",
+                                "name": "Partner hotels",
+                                "name_de_de": "Partnerhotels",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000"
+                            },
+                            "stencil": {
+                                "id": "DataStore"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-CEFA0903-4C81-43CC-A551-9B79A48F5CCD"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 230,
+                                    "y": 142
+                                },
+                                "upperLeft": {
+                                    "x": 168,
+                                    "y": 82
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-82DD4797-AA60-88E0-EFE1-6F5F160C2425",
+                            "properties": {
+                                "name_en_gb": "",
+                                "documentation_en_gb": "",
+                                "subprocesstype": "Embedded",
+                                "looptype": "Parallel",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000"
+                            },
+                            "stencil": {
+                                "id": "Subprocess"
+                            },
+                            "childShapes": [
+                                {
+                                    "resourceId": "sid-28025B9D-3C9A-E519-4995-AC2C7E967137",
+                                    "properties": {
+                                        "name_en_gb": "Send availability\nrequest",
+                                        "name": "Send availability\nrequest",
+                                        "name_de_de": "Verf\u00fcgbarkeitsanfrage\nsenden",
+                                        "documentation_en_gb": "",
+                                        "auditing": "",
+                                        "monitoring": "",
+                                        "flat": "",
+                                        "bgcolor": "#ffffff",
+                                        "bordercolor": "#000000",
+                                        "trigger": "Message"
+                                    },
+                                    "stencil": {
+                                        "id": "IntermediateMessageEventThrowing"
+                                    },
+                                    "childShapes": [],
+                                    "outgoing": [
+                                        {
+                                            "resourceId": "sid-10E71E8F-6517-3444-45A7-4EEBE751C4D7"
+                                        },
+                                        {
+                                            "resourceId": "sid-821902AB-794D-A6F3-94A0-F2BA29A1FC26"
+                                        }
+                                    ],
+                                    "bounds": {
+                                        "lowerRight": {
+                                            "x": 75,
+                                            "y": 75
+                                        },
+                                        "upperLeft": {
+                                            "x": 45,
+                                            "y": 45
+                                        }
+                                    },
+                                    "dockers": [
+                                        {
+                                            "x": 60,
+                                            "y": 60
+                                        }
+                                    ]
+                                },
+                                {
+                                    "resourceId": "sid-7B7E3D4A-6965-1A96-4D82-902E81C834A8",
+                                    "properties": {
+                                        "name_en_gb": "Room offer\nreceived",
+                                        "name": "Room offer\nreceived",
+                                        "name_de_de": "Zimmerangebot\nerhalten",
+                                        "documentation_en_gb": "",
+                                        "auditing": "",
+                                        "monitoring": "",
+                                        "flat": "",
+                                        "bgcolor": "#ffffff",
+                                        "bordercolor": "#000000",
+                                        "trigger": "Message"
+                                    },
+                                    "stencil": {
+                                        "id": "IntermediateMessageEventCatching"
+                                    },
+                                    "childShapes": [],
+                                    "outgoing": [],
+                                    "bounds": {
+                                        "lowerRight": {
+                                            "x": 215,
+                                            "y": 75
+                                        },
+                                        "upperLeft": {
+                                            "x": 185,
+                                            "y": 45
+                                        }
+                                    },
+                                    "dockers": [
+                                        {
+                                            "x": 200,
+                                            "y": 60
+                                        }
+                                    ]
+                                }
+                            ],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-67F4D708-D43D-FBA8-4191-DFBC6E5FE6C4"
+                                },
+                                {
+                                    "resourceId": "sid-2184DFB3-E4EA-1B37-7AF7-84A810A5A5EB"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 620,
+                                    "y": 140
+                                },
+                                "upperLeft": {
+                                    "x": 350,
+                                    "y": 25
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-67F4D708-D43D-FBA8-4191-DFBC6E5FE6C4",
+                            "properties": {
+                                "name_en_gb": "5 min",
+                                "name": "5 min",
+                                "name_de_de": "5 min",
+                                "trigger": "Timer",
+                                "boundarycancelactivity2": "true",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000"
+                            },
+                            "stencil": {
+                                "id": "IntermediateTimerEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-BF42FC9A-A2AD-815E-DE1E-C654C91BF8A3"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 635,
+                                    "y": 155
+                                },
+                                "upperLeft": {
+                                    "x": 605,
+                                    "y": 125
+                                }
+                            },
+                            "dockers": [
+                                {
+                                    "x": 265,
+                                    "y": 115
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "sid-A81ADD2D-EB91-C20E-1989-4E573FCB3A7D",
+                            "properties": {
+                                "name_en_gb": "",
+                                "gatewaytype": "XOR",
+                                "markervisible": "true",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000"
+                            },
+                            "stencil": {
+                                "id": "Exclusive_Databased_Gateway"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-9CA14E14-EF30-FC98-7054-F3EC4016177F"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 720,
+                                    "y": 105
+                                },
+                                "upperLeft": {
+                                    "x": 680,
+                                    "y": 65
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-30AF629E-9D5F-A0D9-017B-44438441A5DE",
+                            "properties": {
+                                "name_en_gb": "Rooms\navailable?",
+                                "name": "Rooms\navailable?",
+                                "gatewaytype": "XOR",
+                                "markervisible": "true",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000"
+                            },
+                            "stencil": {
+                                "id": "Exclusive_Databased_Gateway"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-CE1E65C1-9A2F-9491-2CCF-408095ECC332"
+                                },
+                                {
+                                    "resourceId": "sid-8EAC0FC1-F623-8D0F-11DA-BDF3EB380E9C"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 810,
+                                    "y": 105
+                                },
+                                "upperLeft": {
+                                    "x": 770,
+                                    "y": 65
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-F5F8DB65-F540-7157-86B3-09058A9FC8B8",
+                            "properties": {
+                                "name_en_gb": "Select best room\nand book",
+                                "name": "Select best room\nand book",
+                                "name_de_de": "Bestes Zimmer\nausw\u00e4hlen und buchen",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": true,
+                                "tasktype": "Send",
+                                "bgcolor": "#FFFFFF",
+                                "bordercolor": "#000000",
+                                "looptype": "None",
+                                "categories": "",
+                                "startquantity": "1",
+                                "completionquantity": "1",
+                                "isforcompensation": "",
+                                "implementation": "webService"
+                            },
+                            "stencil": {
+                                "id": "Task"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-613EE5D0-F67C-CC2B-8C55-382AD4E950F4"
+                                },
+                                {
+                                    "resourceId": "sid-C49DC65E-7BEB-F10A-D0D2-1FF54DF96818"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 970,
+                                    "y": 125
+                                },
+                                "upperLeft": {
+                                    "x": 870,
+                                    "y": 45
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-A2869A6E-A4F3-15A2-C707-7FD6CF46515B",
+                            "properties": {
+                                "name_en_gb": "Receive booking\nconfirmation",
+                                "name": "Receive booking\nconfirmation",
+                                "name_de_de": "Buchungsbest\u00e4tigung\nerhalten",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "IntermediateMessageEventCatching"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-6CAAB821-39B6-1F5D-A306-BB823A7C760F"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1060,
+                                    "y": 100
+                                },
+                                "upperLeft": {
+                                    "x": 1030,
+                                    "y": 70
+                                }
+                            },
+                            "dockers": [
+                                {
+                                    "x": 1045,
+                                    "y": 85
+                                }
+                            ]
+                        },
+                        {
+                            "resourceId": "sid-D83967FC-9C4B-E00B-18A3-59B9AADF8AA9",
+                            "properties": {
+                                "name_en_gb": "Prepare confirmation\ndocuments",
+                                "name": "Prepare confirmation\ndocuments",
+                                "name_de_de": "Best\u00e4tigungsdokumente\nvorbereiten",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": true,
+                                "tasktype": "None",
+                                "bgcolor": "#FFFFFF",
+                                "bordercolor": "#000000",
+                                "looptype": "None",
+                                "categories": "",
+                                "startquantity": "1",
+                                "completionquantity": "1",
+                                "isforcompensation": "",
+                                "implementation": "webService"
+                            },
+                            "stencil": {
+                                "id": "Task"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-6DE497D8-8EF1-1E19-388B-11C4295C9C6F"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1210,
+                                    "y": 125
+                                },
+                                "upperLeft": {
+                                    "x": 1110,
+                                    "y": 45
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-0BD4BB18-EE8E-1CC7-9031-D8F4358CA47D",
+                            "properties": {
+                                "name_en_gb": "Confirmation\nsent",
+                                "name": "Confirmation\nsent",
+                                "name_de_de": "Best\u00e4tigung\ngesendet",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "Message"
+                            },
+                            "stencil": {
+                                "id": "EndMessageEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [
+                                {
+                                    "resourceId": "sid-02D5D1AF-73B6-F7E0-AB9C-C09DC277DAFB"
+                                }
+                            ],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 1310,
+                                    "y": 99
+                                },
+                                "upperLeft": {
+                                    "x": 1282,
+                                    "y": 71
+                                }
+                            },
+                            "dockers": []
+                        },
+                        {
+                            "resourceId": "sid-886FD0CA-517E-6109-ED68-23CBE4AAA64D",
+                            "properties": {
+                                "name_en_gb": "No rooms\navailable",
+                                "name": "No rooms\navailable",
+                                "name_de_de": "Keine Zimmer\nverf\u00fcgbar",
+                                "documentation_en_gb": "",
+                                "auditing": "",
+                                "monitoring": "",
+                                "flat": "",
+                                "bgcolor": "#ffffff",
+                                "bordercolor": "#000000",
+                                "trigger": "None"
+                            },
+                            "stencil": {
+                                "id": "EndNoneEvent"
+                            },
+                            "childShapes": [],
+                            "outgoing": [],
+                            "bounds": {
+                                "lowerRight": {
+                                    "x": 870,
+                                    "y": 175
+                                },
+                                "upperLeft": {
+                                    "x": 842,
+                                    "y": 147
+                                }
+                            },
+                            "dockers": []
+                        }
+                    ],
+                    "outgoing": [],
+                    "bounds": {
+                        "lowerRight": {
+                            "x": 1440,
+                            "y": 185
+                        },
+                        "upperLeft": {
+                            "x": 30,
+                            "y": 0
+                        }
+                    },
+                    "dockers": []
+                }
+            ],
+            "outgoing": [],
+            "bounds": {
+                "lowerRight": {
+                    "x": 1500,
+                    "y": 420
+                },
+                "upperLeft": {
+                    "x": 30,
+                    "y": 235
+                }
+            },
+            "dockers": []
+        },
+        {
+            "resourceId": "sid-AAF3C7D2-C636-A8E6-BE76-F4EF81BE92F3",
+            "properties": {
+                "name_en_gb": "Hotel Chain",
+                "name": "Hotel Chain",
+                "name_de_de": "Hotelkette",
+                "multiinstance": "true",
+                "minimum": "3",
+                "maximum": "3",
+                "bgcolor": "#ffffff",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "CollapsedPool"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-FE032FB5-2C52-0C63-2327-4750413EECD5"
+                },
+                {
+                    "resourceId": "sid-B1AEB614-E983-C356-3BCF-D944F57C903E"
+                },
+                {
+                    "resourceId": "sid-EAFC4949-F76C-CC4D-FEF1-1B60B33E3635"
+                }
+            ],
+            "bounds": {
+                "lowerRight": {
+                    "x": 1350,
+                    "y": 540
+                },
+                "upperLeft": {
+                    "x": 350,
+                    "y": 500
+                }
+            },
+            "dockers": []
+        },
+        {
+            "resourceId": "sid-9F6DFCCD-D87E-B2B1-9FA8-F8CCE2EF8410",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-822F6D23-C245-7AF7-4E2C-BFFF34D73EF3"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 57,
+                    "y": 90
+                },
+                "lowerRight": {
+                    "x": 180,
+                    "y": 90
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-822F6D23-C245-7AF7-4E2C-BFFF34D73EF3"
+            }
+        },
+        {
+            "resourceId": "sid-67AE6ACB-247E-814B-6EC9-1464D2C0A015",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-35319F88-C1CB-B755-DE65-0C956F81AB53"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 230,
+                    "y": 90
+                },
+                "lowerRight": {
+                    "x": 300,
+                    "y": 90
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-35319F88-C1CB-B755-DE65-0C956F81AB53"
+            }
+        },
+        {
+            "resourceId": "sid-DE54B688-89E1-4AA0-EAA8-68ADA28F92EF",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-773379C4-CF30-EBFD-A637-C1AA41CA13EC"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 330,
+                    "y": 90
+                },
+                "lowerRight": {
+                    "x": 940,
+                    "y": 90
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-773379C4-CF30-EBFD-A637-C1AA41CA13EC"
+            }
+        },
+        {
+            "resourceId": "sid-A86AEC1E-A30B-E55E-C122-98B5C89AD82A",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-11CC74E4-87AD-6CBC-B9EB-8E0454866633"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 960,
+                    "y": 45
+                },
+                "lowerRight": {
+                    "x": 1070,
+                    "y": 70
+                }
+            },
+            "dockers": [
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                },
+                {
+                    "x": 960,
+                    "y": 45
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-11CC74E4-87AD-6CBC-B9EB-8E0454866633"
+            }
+        },
+        {
+            "resourceId": "sid-B80DFDCF-C33B-1CA0-8829-9F6F5C860CDF",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-C091A0F8-FC7E-FB4F-BADC-DC693D440823"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 960,
+                    "y": 110
+                },
+                "lowerRight": {
+                    "x": 1070,
+                    "y": 135
+                }
+            },
+            "dockers": [
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                },
+                {
+                    "x": 960,
+                    "y": 135
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-C091A0F8-FC7E-FB4F-BADC-DC693D440823"
+            }
+        },
+        {
+            "resourceId": "sid-6AEC0054-D775-814E-99E2-BA1FAB1D74F2",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-F9A28C49-EF68-0931-AC67-348870393838"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1100,
+                    "y": 45
+                },
+                "lowerRight": {
+                    "x": 1190,
+                    "y": 70
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 1190,
+                    "y": 70
+                },
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                }
+            ],
+            "target": {
+                "resourceId": "sid-F9A28C49-EF68-0931-AC67-348870393838"
+            }
+        },
+        {
+            "resourceId": "sid-106AB701-0116-E635-EA1C-D118B74C2557",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-F9A28C49-EF68-0931-AC67-348870393838"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1100,
+                    "y": 110
+                },
+                "lowerRight": {
+                    "x": 1190,
+                    "y": 135
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 1190,
+                    "y": 110
+                },
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                }
+            ],
+            "target": {
+                "resourceId": "sid-F9A28C49-EF68-0931-AC67-348870393838"
+            }
+        },
+        {
+            "resourceId": "sid-5D817128-7180-59E8-3FCA-39CEBF4AD7AD",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-4C75A852-D120-5CF3-CBBC-1AC26A77EB12"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1230,
+                    "y": 90
+                },
+                "lowerRight": {
+                    "x": 1312,
+                    "y": 90
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-4C75A852-D120-5CF3-CBBC-1AC26A77EB12"
+            }
+        },
+        {
+            "resourceId": "sid-BAEBAA98-BF2C-3FB2-19A4-725BFA297059",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-82DD4797-AA60-88E0-EFE1-6F5F160C2425"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 320,
+                    "y": 65
+                },
+                "lowerRight": {
+                    "x": 350,
+                    "y": 82
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-82DD4797-AA60-88E0-EFE1-6F5F160C2425"
+            }
+        },
+        {
+            "resourceId": "sid-821902AB-794D-A6F3-94A0-F2BA29A1FC26",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-7B7E3D4A-6965-1A96-4D82-902E81C834A8"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 75,
+                    "y": 60
+                },
+                "lowerRight": {
+                    "x": 185,
+                    "y": 60
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-7B7E3D4A-6965-1A96-4D82-902E81C834A8"
+            }
+        },
+        {
+            "resourceId": "sid-2184DFB3-E4EA-1B37-7AF7-84A810A5A5EB",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-A81ADD2D-EB91-C20E-1989-4E573FCB3A7D"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 620,
+                    "y": 82
+                },
+                "lowerRight": {
+                    "x": 680,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-A81ADD2D-EB91-C20E-1989-4E573FCB3A7D"
+            }
+        },
+        {
+            "resourceId": "sid-BF42FC9A-A2AD-815E-DE1E-C654C91BF8A3",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-A81ADD2D-EB91-C20E-1989-4E573FCB3A7D"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 620,
+                    "y": 105
+                },
+                "lowerRight": {
+                    "x": 680,
+                    "y": 140
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 660,
+                    "y": 140
+                },
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                }
+            ],
+            "target": {
+                "resourceId": "sid-A81ADD2D-EB91-C20E-1989-4E573FCB3A7D"
+            }
+        },
+        {
+            "resourceId": "sid-9CA14E14-EF30-FC98-7054-F3EC4016177F",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-30AF629E-9D5F-A0D9-017B-44438441A5DE"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 720,
+                    "y": 85
+                },
+                "lowerRight": {
+                    "x": 770,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-30AF629E-9D5F-A0D9-017B-44438441A5DE"
+            }
+        },
+        {
+            "resourceId": "sid-CE1E65C1-9A2F-9491-2CCF-408095ECC332",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-F5F8DB65-F540-7157-86B3-09058A9FC8B8"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 810,
+                    "y": 85
+                },
+                "lowerRight": {
+                    "x": 870,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-F5F8DB65-F540-7157-86B3-09058A9FC8B8"
+            }
+        },
+        {
+            "resourceId": "sid-8EAC0FC1-F623-8D0F-11DA-BDF3EB380E9C",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-886FD0CA-517E-6109-ED68-23CBE4AAA64D"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 790,
+                    "y": 105
+                },
+                "lowerRight": {
+                    "x": 842,
+                    "y": 161
+                }
+            },
+            "dockers": [
+                {
+                    "x": 20.5,
+                    "y": 20.5
+                },
+                {
+                    "x": 790,
+                    "y": 161
+                },
+                {
+                    "x": 14,
+                    "y": 14
+                }
+            ],
+            "target": {
+                "resourceId": "sid-886FD0CA-517E-6109-ED68-23CBE4AAA64D"
+            }
+        },
+        {
+            "resourceId": "sid-C49DC65E-7BEB-F10A-D0D2-1FF54DF96818",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-A2869A6E-A4F3-15A2-C707-7FD6CF46515B"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 970,
+                    "y": 85
+                },
+                "lowerRight": {
+                    "x": 1030,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-A2869A6E-A4F3-15A2-C707-7FD6CF46515B"
+            }
+        },
+        {
+            "resourceId": "sid-6CAAB821-39B6-1F5D-A306-BB823A7C760F",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-D83967FC-9C4B-E00B-18A3-59B9AADF8AA9"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1060,
+                    "y": 85
+                },
+                "lowerRight": {
+                    "x": 1110,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-D83967FC-9C4B-E00B-18A3-59B9AADF8AA9"
+            }
+        },
+        {
+            "resourceId": "sid-6DE497D8-8EF1-1E19-388B-11C4295C9C6F",
+            "properties": {
+                "conditiontype": "None",
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "SequenceFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-0BD4BB18-EE8E-1CC7-9031-D8F4358CA47D"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1210,
+                    "y": 85
+                },
+                "lowerRight": {
+                    "x": 1282,
+                    "y": 85
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 50,
+                    "y": 40
+                }
+            ],
+            "target": {
+                "resourceId": "sid-0BD4BB18-EE8E-1CC7-9031-D8F4358CA47D"
+            }
+        },
+        {
+            "resourceId": "sid-02A16D70-61F2-530E-4021-68D427126C72",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-2B89A0E5-CD97-A2BA-9D44-76517AE15414"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 315,
+                    "y": 130
+                },
+                "lowerRight": {
+                    "x": 315,
+                    "y": 285
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-2B89A0E5-CD97-A2BA-9D44-76517AE15414"
+            }
+        },
+        {
+            "resourceId": "sid-10E71E8F-6517-3444-45A7-4EEBE751C4D7",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-AAF3C7D2-C636-A8E6-BE76-F4EF81BE92F3"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 470,
+                    "y": 350
+                },
+                "lowerRight": {
+                    "x": 470,
+                    "y": 500
+                }
+            },
+            "dockers": [
+                {
+                    "x": 15,
+                    "y": 15
+                },
+                {
+                    "x": 100,
+                    "y": 20
+                }
+            ],
+            "target": {
+                "resourceId": "sid-AAF3C7D2-C636-A8E6-BE76-F4EF81BE92F3"
+            }
+        },
+        {
+            "resourceId": "sid-FE032FB5-2C52-0C63-2327-4750413EECD5",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-7B7E3D4A-6965-1A96-4D82-902E81C834A8"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 590,
+                    "y": 350
+                },
+                "lowerRight": {
+                    "x": 590,
+                    "y": 500
+                }
+            },
+            "dockers": [
+                {
+                    "x": 200,
+                    "y": 20
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-7B7E3D4A-6965-1A96-4D82-902E81C834A8"
+            }
+        },
+        {
+            "resourceId": "sid-613EE5D0-F67C-CC2B-8C55-382AD4E950F4",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-AAF3C7D2-C636-A8E6-BE76-F4EF81BE92F3"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 920,
+                    "y": 360
+                },
+                "lowerRight": {
+                    "x": 920,
+                    "y": 500
+                }
+            },
+            "dockers": [
+                {
+                    "x": 50,
+                    "y": 40
+                },
+                {
+                    "x": 400,
+                    "y": 20
+                }
+            ],
+            "target": {
+                "resourceId": "sid-AAF3C7D2-C636-A8E6-BE76-F4EF81BE92F3"
+            }
+        },
+        {
+            "resourceId": "sid-B1AEB614-E983-C356-3BCF-D944F57C903E",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-A2869A6E-A4F3-15A2-C707-7FD6CF46515B"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1045,
+                    "y": 350
+                },
+                "lowerRight": {
+                    "x": 1045,
+                    "y": 500
+                }
+            },
+            "dockers": [
+                {
+                    "x": 500,
+                    "y": 20
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-A2869A6E-A4F3-15A2-C707-7FD6CF46515B"
+            }
+        },
+        {
+            "resourceId": "sid-02D5D1AF-73B6-F7E0-AB9C-C09DC277DAFB",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-11CC74E4-87AD-6CBC-B9EB-8E0454866633"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1085,
+                    "y": 130
+                },
+                "lowerRight": {
+                    "x": 1296,
+                    "y": 320
+                }
+            },
+            "dockers": [
+                {
+                    "x": 14,
+                    "y": 14
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-11CC74E4-87AD-6CBC-B9EB-8E0454866633"
+            }
+        },
+        {
+            "resourceId": "sid-EAFC4949-F76C-CC4D-FEF1-1B60B33E3635",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "MessageFlow"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-C091A0F8-FC7E-FB4F-BADC-DC693D440823"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 1085,
+                    "y": 160
+                },
+                "lowerRight": {
+                    "x": 1085,
+                    "y": 500
+                }
+            },
+            "dockers": [
+                {
+                    "x": 700,
+                    "y": 20
+                },
+                {
+                    "x": 15,
+                    "y": 15
+                }
+            ],
+            "target": {
+                "resourceId": "sid-C091A0F8-FC7E-FB4F-BADC-DC693D440823"
+            }
+        },
+        {
+            "resourceId": "sid-CEFA0903-4C81-43CC-A551-9B79A48F5CCD",
+            "properties": {
+                "bordercolor": "#000000"
+            },
+            "stencil": {
+                "id": "Association_Unidirectional"
+            },
+            "childShapes": [],
+            "outgoing": [
+                {
+                    "resourceId": "sid-82DD4797-AA60-88E0-EFE1-6F5F160C2425"
+                }
+            ],
+            "bounds": {
+                "upperLeft": {
+                    "x": 230,
+                    "y": 347
+                },
+                "lowerRight": {
+                    "x": 350,
+                    "y": 355
+                }
+            },
+            "dockers": [
+                {
+                    "x": 31,
+                    "y": 30
+                },
+                {
+                    "x": 1,
+                    "y": 60
+                }
+            ],
+            "target": {
+                "resourceId": "sid-82DD4797-AA60-88E0-EFE1-6F5F160C2425"
+            }
+        }
+    ],
+    "bounds": {
+        "lowerRight": {
+            "x": 1600,
+            "y": 1050
+        },
+        "upperLeft": {
+            "x": 0,
+            "y": 0
+        }
+    },
+    "stencilset": {
+        "url": "/stencilsets/bpmn2.0/bpmn2.0.json?version=18.1.3",
+        "namespace": "http://b3mn.org/stencilset/bpmn2.0#"
+    }
+}

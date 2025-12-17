@@ -34,7 +34,7 @@ def get_flows_with_values(bpmn_instance):
         # Then try gateways (by type)
         elem = get_element_by_id_from_sublist(bpmn_instance.get("gateways", []), ref_id)
         if elem:
-            return elem.get("type", "")
+            return elem.get("name") or elem.get("type", "")
         return ""
 
     sequence_flows_with_values = []

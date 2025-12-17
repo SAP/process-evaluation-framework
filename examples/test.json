@@ -4,6 +4,7 @@
     "documentation_en_gb": "Booking hotel accommodations\nA traveler sends an accommodation request to a travel consultant once trip dates have been determined. The consultant checks availability with multiple hotels, compares offers received within 3 minutes, and proceeds with the most suitable booking. After reserving, the consultant sends a confirmation to the traveler, and the hotel dispatches a booking reference directly to the traveler.\n\nNote: Hotel internal processes are excluded.",
     "language": "English",
     "orientation": "horizontal",
+    "targetnamespace": "http://www.signavio.com/bpmn20",
     "meta-vertraulichkeit_en_gb": "Internal use only",
     "meta-modelingstatus": "Draft"
   },
@@ -121,28 +122,76 @@
       "bounds": { "upperLeft": { "x": 400, "y": 400 }, "lowerRight": { "x": 1200, "y": 450 } }
     },
 
-    { "resourceId": "FlowT1", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "TaskPrepareRequest" }] },
-    { "resourceId": "FlowT2", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "EventSendRequest" }] },
-    { "resourceId": "FlowTEnd", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "EndTravel" }] },
+    {
+      "resourceId": "FlowT1",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "TaskPrepareRequest" }],
+      "target": { "resourceId": "TaskPrepareRequest" }
+    },
+    {
+      "resourceId": "FlowT2",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "EventSendRequest" }],
+      "target": { "resourceId": "EventSendRequest" }
+    },
+    {
+      "resourceId": "FlowTEnd",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "EndTravel" }],
+      "target": { "resourceId": "EndTravel" }
+    },
 
-    { "resourceId": "FlowC1", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "SubprocessCollectOffers" }] },
-    { "resourceId": "FlowC2", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "GatewaySelectOffer" }] },
-    { "resourceId": "FlowC3", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "TaskReserveRoom" }] },
-    { "resourceId": "FlowC4", "stencil": { "id": "SequenceFlow" }, "outgoing": [{ "resourceId": "EndSendConfirmation" }] },
+    {
+      "resourceId": "FlowC1",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "SubprocessCollectOffers" }],
+      "target": { "resourceId": "SubprocessCollectOffers" }
+    },
+    {
+      "resourceId": "FlowC2",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "GatewaySelectOffer" }],
+      "target": { "resourceId": "GatewaySelectOffer" }
+    },
+    {
+      "resourceId": "FlowC3",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "TaskReserveRoom" }],
+      "target": { "resourceId": "TaskReserveRoom" }
+    },
+    {
+      "resourceId": "FlowC4",
+      "stencil": { "id": "SequenceFlow" },
+      "properties": { "conditiontype": "None" },
+      "outgoing": [{ "resourceId": "EndSendConfirmation" }],
+      "target": { "resourceId": "EndSendConfirmation" }
+    },
 
     {
       "resourceId": "MessageToConsultant",
       "stencil": { "id": "MessageFlow" },
+      "properties": {},
+      "outgoing": [{ "resourceId": "StartConsultant" }],
       "target": { "resourceId": "StartConsultant" }
     },
     {
       "resourceId": "MessageToHotel",
       "stencil": { "id": "MessageFlow" },
+      "properties": {},
+      "outgoing": [{ "resourceId": "PoolHotel" }],
       "target": { "resourceId": "PoolHotel" }
     },
     {
       "resourceId": "MessageToTraveler",
       "stencil": { "id": "MessageFlow" },
+      "properties": {},
+      "outgoing": [{ "resourceId": "EventReceiveConfirm" }],
       "target": { "resourceId": "EventReceiveConfirm" }
     }
   ],
