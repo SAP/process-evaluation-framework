@@ -2,15 +2,15 @@
 from sentence_transformers import SentenceTransformer, util
 
 
-def bert_cosine(t1, t2):
-    """context-aware similarity measure for two strings using bert sentence transformer and cosine similarity"""
-    model = SentenceTransformer("sentence-transformers/stsb-mpnet-base-v2")
-    sentences = [t1, t2]
-    embedding_1 = model.encode(sentences[0], convert_to_tensor=True)
-    embedding_2 = model.encode(sentences[1], convert_to_tensor=True)
-    score = util.pytorch_cos_sim(embedding_1, embedding_2)
-    score = score.tolist()
-    return score[0][0]
+# def sim_cosine(t1, t2):
+#     """context-aware similarity measure for two strings using bert sentence transformer and cosine similarity"""
+#     model = SentenceTransformer("sentence-transformers/stsb-mpnet-base-v2")
+#     sentences = [t1, t2]
+#     embedding_1 = model.encode(sentences[0], convert_to_tensor=True)
+#     embedding_2 = model.encode(sentences[1], convert_to_tensor=True)
+#     score = util.pytorch_cos_sim(embedding_1, embedding_2)
+#     score = score.tolist()
+#     return score[0][0]
 
 
 model = SentenceTransformer('Alibaba-NLP/gte-large-en-v1.5', trust_remote_code=True)
@@ -18,8 +18,8 @@ model = SentenceTransformer('Alibaba-NLP/gte-large-en-v1.5', trust_remote_code=T
 cache = {}
 
 
-def bert_cosine_optimized(t1, t2):
-    """optimized function of bert_cosine. uses a cache to safe time when calculating duplicate similarities
+def cosine_sim_optimized(t1, t2):
+    """optimized function of . uses a cache to safe time when calculating duplicate similarities
     reason: for longer inputs bert can be very compute intensive. adding a cache can reduce minutes to seconds
     """
 
