@@ -1,41 +1,7 @@
 # similarity functions for comparing two bpmn instances
 
-
-
-
-
-from list_similarity import dice_list, jaccard_list, scores, index_list
 from bpmn_sets import extract_bpmn_sets
-
-
-# def weighted_score(array_of_scores_with_weights):
-#     """Calculates a weighted score.
-#     Takes an array like this: [{"score": 0.3, "weight": 5},{"score": 0.8, "weight": 6}]
-#     """
-#     numerator, denominator = 0, 0
-#     for score_with_weight in array_of_scores_with_weights:
-#         score = score_with_weight["score"]
-#         weight = score_with_weight["weight"]
-#         numerator += score * weight
-#         denominator += weight
-
-#     if denominator == 0:
-#         return 0
-#     else:
-#         return numerator / denominator
-
-
-# def get_list(bpmn_object, sublist, attribute):
-#     """Returns a list of attributes within a sublist of a bpmn_object.
-#     For example sublist="tasks", attribute="name" returns the list of task names"""
-#     return list(
-#         map(lambda t: t[attribute], filter(lambda x: x.get(attribute), bpmn_object[sublist]))
-#     )
-
-
-
-## Set extraction now uses extract_bpmn_sets from bpmn_sets.py
-
+from utils.list_similarity import dice_list, index_list, jaccard_list, scores
 
 
 def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights=None):

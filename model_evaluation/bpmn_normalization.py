@@ -14,7 +14,7 @@ Typical workflow:
 
 Example:
     from bpmn_normalization import normalize_atomic_names
-    from string_similarity import bert_cosine_optimized
+    from utils.string_similarity import bert_cosine_optimized
 
     model2_aligned, mappings = normalize_atomic_names(
         model1, model2, bert_cosine_optimized, threshold=0.7
@@ -171,17 +171,25 @@ def build_name_mapping(names1, names2, similarity_func, threshold=0.7):
         >>> build_name_mapping(names1, names2, bert_cosine_optimized, threshold=0.8)
         {'Plan travels': 'Plan travel', 'Book flights': 'Book flight'}
     """
-    mapping = {}
+    # Build all candidate pairs with scores
+    candidates = []
     for n2 in names2:
-        best_score = -float("inf")
-        best_n1 = None
         for n1 in names1:
             score = similarity_func(n1, n2)
-            if score > best_score:
-                best_score = score
-                best_n1 = n1
-        if best_score >= threshold:
-            mapping[n2] = best_n1
+            if score >= threshold:
+                candidates.append((score, n2, n1))
+
+    # Sort by score descending (best matches first)
+    candidates.sort(reverse=True)
+
+    # Assign greedily, respecting 1-to-1
+    mapping = {}
+    used_n1 = set()
+    for score, n2, n1 in candidates:
+        if n2 not in mapping and n1 not in used_n1:
+            mapping[n2] = n1
+            used_n1.add(n1)
+
     return mapping
 
 
