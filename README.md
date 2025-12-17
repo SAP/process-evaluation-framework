@@ -4,7 +4,41 @@
 
 ## About this project
 
-This repo contains code that serve as process evaluation metrics
+This repository provides a comprehensive framework for evaluating and comparing BPMN process models using semantic similarity metrics. In addition to structural similarity, we also report a trace similarity score.
+
+**Evaluation Pipeline:**
+
+1. **Load Models** - Import BPMN models from Signavio JSON format
+2. **Convert** - Transform to minimal BPMN representation
+3. **Normalize** - Align element names semantically using an embedding sentence transformer model (e.g., "Book flight" ↔ "Book a flight")
+4. **Extract Sets and Traces** - Separate top-level and subprocess elements automatically
+5. **Calculate Similarity** - Compute structural, flow, organizational, subprocess and trace similarity scores
+6. **Visualize** - Interactive dashboard with adjustable weights and metrics (Dice, Jaccard, Precision, Recall, F1)
+
+The framework supports pools, lanes, message flows, subprocesses, and provides detailed element-level breakdowns with configurable category weights.
+
+## Project Structure
+
+```
+model_evaluation/
+├── utils/                      # Utility functions
+│   ├── string_similarity.py    # BERT-based semantic similarity
+│   └── list_similarity.py      # Set comparison metrics (Dice, Jaccard, etc.)
+├── rendering/                  # Visualization modules
+│   ├── bpmn_viewer.py          # BPMN XML viewer using bpmn-js
+│   └── dashboard.py            # Interactive similarity dashboard
+├── BPMN_conversion.py          # Signavio JSON → minimal BPMN converter
+├── bpmn_normalization.py       # Semantic name alignment
+├── bpmn_sets.py                # Element set extraction
+├── bpmn_similarity.py          # Similarity calculation engine
+├── bpmn_schema.py              # Data structures and validation
+└── sapsam_mapping.py           # SAP-specific mappings
+
+notebooks/
+└── model_eval_code_usage.ipynb # Usage examples and demonstrations
+
+examples/                       # Sample BPMN models for testing
+```
 
 ## Requirements and Setup
 

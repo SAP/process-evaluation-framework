@@ -6,9 +6,9 @@ bpmn_schema = {
     "title": "BPMN Schema",
     "type": "object",
     "properties": {
-        "tasks": {
+        "activities": {
             "type": "array",
-            "items": {"$ref": "#/$defs/task"},
+            "items": {"$ref": "#/$defs/activity"},
         },
         "events": {"type": "array", "items": {"$ref": "#/$defs/event"}},
         "gateways": {"type": "array", "items": {"$ref": "#/$defs/gateway"}},
@@ -16,9 +16,9 @@ bpmn_schema = {
         "sequenceFlows": {"type": "array", "items": {"$ref": "#/$defs/sequenceFlow"}},
         "messageFlows": {"type": "array", "items": {"$ref": "#/$defs/messageFlow"}},
     },
-    "required": ["tasks", "events", "gateways", "pools", "sequenceFlows", "messageFlows"],
+    "required": ["activities", "events", "gateways", "pools", "sequenceFlows", "messageFlows"],
     "$defs": {
-        "task": {
+        "activity": {
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
@@ -27,19 +27,32 @@ bpmn_schema = {
                     "enum": [
                         "Task",
                         "Manual",
-                        "CollapsedSubprocess",
-                        "Service",
                         "User",
                         "Send",
-                        "Business Rule",
                         "Receive",
+                        "Service",
+                        "Business Rule",
                         "Script",
+                        "Subprocess",
+                        "CollapsedSubprocess",
+                        "EventSubprocess",
                         "CollapsedEventSubprocess",
                     ]
                 },
+                "parent_subprocess": {"type": "string"},
+                "elemRefs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "IDs of elements inside this subprocess (for expanded subprocesses)"
+                },
+                "subprocessSequenceFlows": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/sequenceFlow"},
+                    "description": "Sequence flows internal to this subprocess"
+                },
             },
-            "required": ["id", "name", "type"],
-            "description": "A unit of work, the job to be performed",
+            "required": ["id", "type"],
+            "description": "A unit of work, the job to be performed. Can be a simple task or a subprocess containing other elements.",
         },
         "event": {
             "type": "object",
@@ -67,8 +80,9 @@ bpmn_schema = {
                         "IntermediateLinkEventCatching",
                     ]
                 },
+                "parent_subprocess": {"type": "string"},
             },
-            "required": ["id", "name", "type"],
+            "required": ["id", "type"],
         },
         "gateway": {
             "type": "object",
@@ -76,6 +90,7 @@ bpmn_schema = {
                 "id": {"type": "string"},
                 "name": {"type": "string"},
                 "type": {"enum": ["Exclusive", "Parallel", "Eventbased", "Inclusive", "Complex"]},
+                "parent_subprocess": {"type": "string"},
             },
             "required": ["id", "type"],
         },
