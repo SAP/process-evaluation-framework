@@ -11,67 +11,6 @@ def index_list(lst):
         indexed.append(f"{item}{count[item]}")
     return indexed
 
-# def calculate_bpmn_overall_similarity(sets1, sets2, method="dice", weights=None):
-#     """
-#     Calculates a weighted overall similarity score for BPMN sets.
-#     Uses frequency-aware similarity for all sets.
-#     User can supply a weights dict for categories.
-#     """
-#     # Default categories and weights
-#     default_categories = {
-#         "structural": {
-#             "keys": ["activity_names", "activity_types", "event_names", "event_types", "gateway_names", "gateway_types"],
-#             "weight": 0.35
-#         },
-#         "flows": {
-#             "keys": ["seq_flows_str", "mes_flows_str"],
-#             "weight": 0.45
-#         },
-#         "organizational": {
-#             "keys": ["lane_names", "lane_with_refs"],
-#             "weight": 0.15
-#         },
-#         "subprocess": {
-#             "keys": ["subprocess_names", "subprocess_elemrefs"],
-#             "weight": 0.05
-#         }
-#     }
-
-#     # If user supplies weights, override defaults
-#     if weights is not None:
-#         for cat in default_categories:
-#             if cat in weights:
-#                 default_categories[cat]["weight"] = weights[cat]
-
-#     def freq_sim(list1, list2):
-#         l1 = index_list_counter(list1)
-#         l2 = index_list_counter(list2)
-#         if method == "dice":
-#             return dice_list(l1, l2)[0]
-#         elif method == "jaccard":
-#             return jaccard_list(l1, l2)[0]
-#         elif method in {"precision", "recall", "f1"}:
-#             return scores(l1, l2, score_type=method)[0]
-#         else:
-#             raise ValueError("Unsupported method")
-
-#     category_scores = {}
-#     for cat, info in default_categories.items():
-#         sims = []
-#         for key in info["keys"]:
-#             if key in sets1 and key in sets2 and (sets1[key] or sets2[key]):
-#                 sims.append(freq_sim(sets1[key], sets2[key]))
-#         category_scores[cat] = sum(sims) / len(sims) if sims else 0
-
-#     # Weighted sum
-#     total_weight = sum(default_categories[cat]["weight"] for cat in default_categories)
-#     overall = sum(category_scores[cat] * default_categories[cat]["weight"] for cat in default_categories) / total_weight
-#     return overall, category_scores
-# # similarity functions for comparing two lists
-
-
-# from string_similarity import bert_cosine_optimized
-
 
 def dice_list(list1, list2):
     """Dice similarity is a common similarity metrics for two sets. Defining Dice Similarity function for two lists"""
