@@ -5,7 +5,7 @@ description = ""
 authors = ["raheleh <raheleh.hadian@sap.com>"]
 readme = "README.md"
 packages = [
-    { include = "bpmn_evaluation_framework" },
+    #{ include = "bpmn_evaluation_framework" },
     { include = "model_evaluation" },
 ]
 
@@ -14,7 +14,7 @@ name = "PyPI"
 priority = "primary"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.11,<3.13"
 generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
 ipykernel = "^6.29.5"
 scikit-learn = "^1.6.1"
