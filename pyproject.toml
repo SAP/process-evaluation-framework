@@ -5,7 +5,7 @@ description = ""
 authors = ["raheleh <raheleh.hadian@sap.com>"]
 readme = "README.md"
 packages = [
-    { include = "bpmn_evaluation_framework" },
+    #{ include = "bpmn_evaluation_framework" },
     { include = "model_evaluation" },
 ]
 
@@ -26,14 +26,14 @@ url = "https://common.repositories.cloud.sap/artifactory/api/pypi/signavio-pypi/
 priority = "explicit"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.11,<3.13"
 generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
 ipykernel = "^6.29.5"
 scikit-learn = "^1.6.1"
 sentence-transformers = "^4.1.0"
 pandas = "^2.2.3"
-signavio-authentication = {version = "^1.4.9", source = "signavio"}
-signavio = {version = "^2.8.3", source = "signavio"}
+#signavio-authentication = {version = "^1.4.9", source = "signavio"}
+signavio = {version = ">=2.12.1", source = "signavio"}
 ipywidgets = "^8.1.8"
 matplotlib = "^3.10.7"
 lxml = "^6.0.2"

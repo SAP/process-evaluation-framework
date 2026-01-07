@@ -11,7 +11,7 @@ This repository provides a comprehensive framework for evaluating and comparing 
 1. **Load Models** - Import BPMN models from Signavio JSON format
 2. **Convert** - Transform to minimal BPMN representation
 3. **Normalize** - Align element names semantically using an embedding sentence transformer model (e.g., "Book flight" ↔ "Book a flight")
-4. **Extract Sets and Traces** - Separate top-level and subprocess elements automatically
+4. **Extract Traces** - Convert to Petri nets and extract execution traces/variants to analyze behavioral similarity
 5. **Calculate Similarity** - Compute structural, flow, organizational, subprocess and trace similarity scores
 6. **Visualize** - Interactive dashboard with adjustable weights and metrics (Dice, Jaccard, Precision, Recall, F1)
 
@@ -32,6 +32,9 @@ model_evaluation/
 ├── bpmn_sets.py                # Element set extraction
 ├── bpmn_similarity.py          # Similarity calculation engine
 ├── bpmn_schema.py              # Data structures and validation
+├── json_to_pn.py               # Minimal JSON to Flow Structure
+├── petri.py                    # Petri net
+├── trace_extraction.py         # Trace/variant extraction via Petri nets
 └── sapsam_mapping.py           # SAP-specific mappings
 
 notebooks/
