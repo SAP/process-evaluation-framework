@@ -372,3 +372,20 @@ class BPMNConverter:
         # for act in model.activities:
         #     if "parent_subprocess" in act:
         #         del act["parent_subprocess"]
+
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Module Usage: python BPMN_conversion.py <file.json>, this then prints minimal model to stdout", file=sys.stderr)
+        sys.exit(1)
+
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        data = fh.read()
+
+    model = BPMNConverter.convert(data)
+    print(model.to_json())
+
+
