@@ -35,7 +35,8 @@ model_evaluation/
 ├── json_to_pn.py               # Minimal JSON to Flow Structure
 ├── petri.py                    # Petri net
 ├── trace_extraction.py         # Trace/variant extraction via Petri nets
-└── sapsam_mapping.py           # SAP-specific mappings
+├── sapsam_mapping.py           # SAP-specific mappings
+└── XML_conversion.py           # BPMN XML 2.0 → minimal BPMN converter
 
 notebooks/
 └── model_eval_code_usage.ipynb # Usage examples and demonstrations
