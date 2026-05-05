@@ -7,7 +7,7 @@ by converting them to Petri nets and performing state-space exploration.
 from typing import List, Dict, Any
 
 from petri import PetriNet
-
+from utils import dice_list, jaccard_list, overlap_list
 
 
 def extract_traces(
@@ -31,7 +31,6 @@ def extract_traces(
         ValueError: If conversion or extraction fails
         TimeoutError: If extraction exceeds timeout
     """
-    # Convert to Petri net
     petri_net = PetriNet.from_simplified_json(minimal_bpmn)
     return petri_net.net_variants(time_out_sec=timeout_seconds, max_loop_depth=max_loop_depth)
 
@@ -42,37 +41,32 @@ def calculate_trace_similarity(
     method: str = "jaccard"
 ) -> float:
     """Calculate similarity between two sets of traces.
-    
+
     Args:
-        traces_1: First list of traces
-        traces_2: Second list of traces
-        method: Similarity metric ("jaccard", "dice", or "overlap")
-    
+        traces_1: First set of traces
+        traces_2: Second set of traces
+        method: Similarity metric – ``"jaccard"`` (default), ``"dice"``, or
+            ``"overlap"`` (overlap coefficient, computed locally)
+
     Returns:
         Similarity score between 0.0 and 1.0
     """
-    # Convert to sets of tuples for comparison
-    set_1 = {tuple(trace) for trace in traces_1}
-    set_2 = {tuple(trace) for trace in traces_2}
-    
-    if not set_1 and not set_2:
-        return 1.0
-    
-    if not set_1 or not set_2:
-        return 0.0
-    
-    intersection = set_1 & set_2
-    union = set_1 | set_2
-    
+    # Deduplicate: each unique trace is one element in the comparison sets
+    set_1 = list({tuple(trace) for trace in traces_1})
+    set_2 = list({tuple(trace) for trace in traces_2})
+
     if method == "jaccard":
-        return len(intersection) / len(union) if union else 0.0
+        score, _ = jaccard_list(set_1, set_2)
+        return score
     elif method == "dice":
-        return (2.0 * len(intersection)) / (len(set_1) + len(set_2))
+        score, _ = dice_list(set_1, set_2)
+        return score
     elif method == "overlap":
-        min_size = min(len(set_1), len(set_2))
-        return len(intersection) / min_size if min_size > 0 else 0.0
+        score, _ = overlap_list(set_1, set_2)
+        return score
     else:
         raise ValueError(f"Unknown similarity method: {method}")
+
 
 
 def get_trace_statistics(traces: List[List[str]]) -> Dict[str, Any]:
@@ -93,9 +87,7 @@ def get_trace_statistics(traces: List[List[str]]) -> Dict[str, Any]:
             "unique_activities": set()
         }
     
-    # Convert to unique traces
     unique_traces = {tuple(trace) for trace in traces}
-    
     trace_lengths = [len(trace) for trace in unique_traces]
     unique_activities = set()
     for trace in unique_traces:
@@ -127,7 +119,6 @@ def compare_trace_sets(
     Returns:
         Dictionary containing comparison results
     """
-    # Convert to sets for comparison
     set_1 = {tuple(trace) for trace in traces_1}
     set_2 = {tuple(trace) for trace in traces_2}
     
@@ -205,3 +196,46 @@ def print_trace_comparison(comparison: Dict[str, Any], show_traces: bool = False
             print(f"  {i}. {' → '.join(trace)}")
     
     print(f"{'='*70}\n")
+
+
+
+# --- Deprecated: calculate_trace_similarity ---
+# This function is no longer needed since we now use utils/list_similarity.py for all list comparisons.
+# Keeping for reference; safe to remove in the future.
+# def calculate_trace_similarity(
+#     traces_1: List[List[str]],
+#     traces_2: List[List[str]],
+#     method: str = "jaccard"
+# ) -> float:
+#     """Calculate similarity between two sets of traces.
+    
+#     Args:
+#         traces_1: First list of traces
+#         traces_2: Second list of traces
+#         method: Similarity metric ("jaccard", "dice", or "overlap")
+    
+#     Returns:
+#         Similarity score between 0.0 and 1.0
+#     """
+#     # Convert to sets of tuples for comparison
+#     set_1 = {tuple(trace) for trace in traces_1}
+#     set_2 = {tuple(trace) for trace in traces_2}
+    
+#     if not set_1 and not set_2:
+#         return 1.0
+    
+#     if not set_1 or not set_2:
+#         return 0.0
+    
+#     intersection = set_1 & set_2
+#     union = set_1 | set_2
+    
+#     if method == "jaccard":
+#         return len(intersection) / len(union) if union else 0.0
+#     elif method == "dice":
+#         return (2.0 * len(intersection)) / (len(set_1) + len(set_2))
+#     elif method == "overlap":
+#         min_size = min(len(set_1), len(set_2))
+#         return len(intersection) / min_size if min_size > 0 else 0.0
+#     else:
+#         raise ValueError(f"Unknown similarity method: {method}")
