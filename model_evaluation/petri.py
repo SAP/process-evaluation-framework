@@ -150,6 +150,27 @@ class PetriNet(BaseModel):
         return enabled
     
 
+    def _is_terminal_marking(self, marking: Marking) -> bool:
+        """Check whether *marking* is a valid terminal state.
+
+        A marking is terminal when:
+        * all places that have tokens are among the final marking's places, AND
+        * every final-marking place has at least the number of tokens required by the final marking.
+
+        This is intentionally more forgiving than ``marking == self.final_marking``
+        because parallel AND‐gateways can converge multiple tokens on the same
+        end place (e.g. 3 tokens in the end place instead of 1), which would
+        otherwise produce deadlocks with 0 traces.
+        """
+        final_places = set(self.final_marking.keys())
+        for place, count in marking.items():
+            if place not in final_places:
+                return False                     # token in a non‑final place
+            if count < self.final_marking[place]:
+                return False                     # not enough tokens in a final place
+        return True
+
+
     def net_variants(self, time_out_sec: float = 1.0, max_loop_depth: int = 3) -> Set[Tuple[str, ...]]:
         active: Set[Tuple[Marking, Tuple[str, ...], Tuple[str, ...]]] = set()
         active.add((self.initial_marking, tuple(), tuple()))
@@ -171,7 +192,7 @@ class PetriNet(BaseModel):
 
             enabled = self.get_enabled_transitions(curr_marking)
 
-            if not enabled and curr_marking == self.final_marking:
+            if not enabled and self._is_terminal_marking(curr_marking):
                 variants.add(curr_trace)
                 continue
 
@@ -189,10 +210,9 @@ class PetriNet(BaseModel):
                 
                 next_trans_names_path = curr_trans_names_path + (t.name,)
 
-                if next_marking == self.final_marking:
+                if self._is_terminal_marking(next_marking):
                     variants.add(next_trace)
-                
-                if next_marking != self.final_marking:
+                else:
                     if len(active) < 20000:
                         active.add((next_marking, next_trace, next_trans_names_path))
         return variants
@@ -444,10 +464,11 @@ class PetriNet(BaseModel):
         raise NotImplementedError("Attached events handling is not implemented yet.")
 
     def _silence_gateway_transitions(self):
+        from model_evaluation.json_to_pn import get_bpmn_element_type, BpmnElementType, GATEWAY_STENCIL_NAMES
         for t in self.transitions:
             if t.name in self.bpmn_id_to_stencil:
-                stencil = self.bpmn_id_to_stencil[t.name]
-                if "gateway" in stencil.lower():
+                stencil = self.bpmn_id_to_stencil[t.name].lower()
+                if "gateway" in stencil or stencil in GATEWAY_STENCIL_NAMES:
                     t.label_for_trace = None
 
     def _ensure_single_start_end_places_and_get_markings(self) -> Tuple[Marking, Marking]:
