@@ -484,7 +484,7 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 2:
-        print("Module Usage: python XML_conversion.py <file.xml>, this then prints minimal model to stdout", file=sys.stderr)
+        print("Module Usage: python XML_conversion.py <file.bpmn>, this then prints minimal model to stdout", file=sys.stderr)
         sys.exit(1)
 
     with open(sys.argv[1], "r", encoding="utf-8") as fh:
