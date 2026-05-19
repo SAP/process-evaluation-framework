@@ -27,16 +27,17 @@ priority = "explicit"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
-generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
+#generative-ai-hub-sdk = {extras = ["all"], version = "^4.10.2"}
 ipykernel = "^6.29.5"
 scikit-learn = "^1.6.1"
 sentence-transformers = "^4.1.0"
 pandas = "^2.2.3"
 #signavio-authentication = {version = "^1.4.9", source = "signavio"}
-signavio = {version = ">=2.12.1", source = "signavio"}
+#signavio = {version = ">=2.12.1", source = "signavio"}
 ipywidgets = "^8.1.8"
 matplotlib = "^3.10.7"
 lxml = "^6.0.2"
+pydantic = "^2.13.4"
 
 
 [build-system]

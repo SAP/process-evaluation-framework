@@ -41,6 +41,21 @@ def jaccard_list(list1, list2):
     return jaccard, weight  # len(set1) + len(set2)
 
 
+def overlap_list(list1, list2):
+    """Overlap coefficient (Szymkiewicz–Simpson) for two lists. https://en.wikipedia.org/wiki/Overlap_coefficient
+    """
+    set1, set2 = set(list1), set(list2)
+    min_size = min(len(set1), len(set2))
+    if min_size == 0:
+        return (1, 0) if len(set1) == len(set2) else (0, 0)
+    intersection = len(set1.intersection(set2))
+    overlap = float(intersection) / min_size
+    weight = (
+        (2 * len(set1) * len(set2)) / (len(set1) + len(set2)) if (len(set1) + len(set2)) != 0 else 0
+    )
+    return overlap, weight
+
+
 def scores(list_1, list_2, score_type="precision"):
     """list_1 is the ground truth, list_2 is the generated list"""
     # Convert lists to sets

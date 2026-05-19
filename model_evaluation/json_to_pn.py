@@ -20,12 +20,14 @@ class BpmnElementType(Enum):
 def get_bpmn_element_stereotype(bpmn_id: str, bpmn_id_to_stencil: Dict[str, str]) -> str:
     return bpmn_id_to_stencil.get(bpmn_id, "")
 
+GATEWAY_STENCIL_NAMES = {"exclusive", "inclusive", "parallel", "complex", "eventbased"}
+
 def get_bpmn_element_type(bpmn_id: str, bpmn_id_to_stencil: Dict[str, str]) -> BpmnElementType:
     stencil = bpmn_id_to_stencil.get(bpmn_id, "").lower()
 
     if any(event_keyword in stencil for event_keyword in ["event", "startevent", "endevent"]):
         return BpmnElementType.EVENT
-    if "gateway" in stencil:
+    if "gateway" in stencil or stencil in GATEWAY_STENCIL_NAMES:
         return BpmnElementType.GATEWAY
     if any(task_keyword in stencil for task_keyword in ["task", "subprocess", "callactivity", "transaction"]):
          return BpmnElementType.TASK
