@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" xmlns:signavio="http://www.signavio.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="Signavio Process Editor, http://www.signavio.com" exporterVersion="17.6.1" expressionLanguage="http://www.w3.org/TR/XPath" id="sid-88ae5102-6e90-47fc-933d-785bf2c61002" targetNamespace="http://www.signavio.com" typeLanguage="http://www.w3.org/2001/XMLSchema" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
+   <process id="sid-a9958064-c611-4ce5-9c83-67d8cd3f0002" isClosed="false" isExecutable="false" processType="None">
+      <startEvent id="sid-START-0002" name="Start">
+         <outgoing>sid-FLOW-0021</outgoing>
+      </startEvent>
+      <task completionQuantity="1" id="sid-TASK-0021" isForCompensation="false" name="receive order" startQuantity="1">
+         <incoming>sid-FLOW-0021</incoming>
+         <outgoing>sid-FLOW-0022</outgoing>
+      </task>
+      <task completionQuantity="1" id="sid-TASK-0022" isForCompensation="false" name="validate order" startQuantity="1">
+         <incoming>sid-FLOW-0022</incoming>
+         <outgoing>sid-FLOW-0023</outgoing>
+      </task>
+      <task completionQuantity="1" id="sid-TASK-0023" isForCompensation="false" name="approve order" startQuantity="1">
+         <incoming>sid-FLOW-0023</incoming>
+         <outgoing>sid-FLOW-0024</outgoing>
+      </task>
+      <task completionQuantity="1" id="sid-TASK-0024" isForCompensation="false" name="dispatch order" startQuantity="1">
+         <incoming>sid-FLOW-0024</incoming>
+         <outgoing>sid-FLOW-0025</outgoing>
+      </task>
+      <endEvent id="sid-END-0002" name="End">
+         <incoming>sid-FLOW-0025</incoming>
+      </endEvent>
+      <sequenceFlow id="sid-FLOW-0021" sourceRef="sid-START-0002" targetRef="sid-TASK-0021"/>
+      <sequenceFlow id="sid-FLOW-0022" sourceRef="sid-TASK-0021" targetRef="sid-TASK-0022"/>
+      <sequenceFlow id="sid-FLOW-0023" sourceRef="sid-TASK-0022" targetRef="sid-TASK-0023"/>
+      <sequenceFlow id="sid-FLOW-0024" sourceRef="sid-TASK-0023" targetRef="sid-TASK-0024"/>
+      <sequenceFlow id="sid-FLOW-0025" sourceRef="sid-TASK-0024" targetRef="sid-END-0002"/>
+   </process>
+   <bpmndi:BPMNDiagram id="sid-diagram-0002">
+      <bpmndi:BPMNPlane bpmnElement="sid-a9958064-c611-4ce5-9c83-67d8cd3f0002" id="sid-plane-0002">
+         <bpmndi:BPMNShape bpmnElement="sid-START-0002" id="sid-START-0002_gui">
+            <omgdc:Bounds height="30.0" width="30.0" x="270.0" y="550.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0021" id="sid-TASK-0021_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="345.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0022" id="sid-TASK-0022_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="490.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0023" id="sid-TASK-0023_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="635.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0024" id="sid-TASK-0024_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="780.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-END-0002" id="sid-END-0002_gui">
+            <omgdc:Bounds height="28.0" width="28.0" x="925.0" y="551.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0021" id="sid-FLOW-0021_gui">
+            <omgdi:waypoint x="300.0" y="565.0"/>
+            <omgdi:waypoint x="345.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0022" id="sid-FLOW-0022_gui">
+            <omgdi:waypoint x="445.0" y="565.0"/>
+            <omgdi:waypoint x="490.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0023" id="sid-FLOW-0023_gui">
+            <omgdi:waypoint x="590.0" y="565.0"/>
+            <omgdi:waypoint x="635.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0024" id="sid-FLOW-0024_gui">
+            <omgdi:waypoint x="735.0" y="565.0"/>
+            <omgdi:waypoint x="780.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0025" id="sid-FLOW-0025_gui">
+            <omgdi:waypoint x="880.0" y="565.0"/>
+            <omgdi:waypoint x="925.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+      </bpmndi:BPMNPlane>
+   </bpmndi:BPMNDiagram>
+</definitions>

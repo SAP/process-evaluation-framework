@@ -153,7 +153,7 @@ class PetriNet(BaseModel):
     def net_variants(self, time_out_sec: float = 1.0, max_loop_depth: int = 3) -> Set[Tuple[str, ...]]:
         active: Set[Tuple[Marking, Tuple[str, ...], Tuple[str, ...]]] = set()
         active.add((self.initial_marking, tuple(), tuple()))
-        
+
         variants: Set[Tuple[str, ...]] = set()
         start_time: float = time.monotonic()
         visited_states: Set[Tuple[Marking, Tuple[str, ...]]] = set()
@@ -163,7 +163,7 @@ class PetriNet(BaseModel):
                 break
 
             curr_marking, curr_trace, curr_trans_names_path = active.pop()
-            
+
             state_key = (curr_marking, curr_trace)
             if state_key in visited_states:
                 continue
@@ -171,8 +171,18 @@ class PetriNet(BaseModel):
 
             enabled = self.get_enabled_transitions(curr_marking)
 
-            if not enabled and curr_marking == self.final_marking:
-                variants.add(curr_trace)
+            if not enabled:
+                if curr_marking == self.final_marking:
+                    variants.add(curr_trace)
+                else:
+                    deadlocked_places = {p.name: n for p, n in curr_marking.items()}
+                    raise ValueError(
+                        f"Workflow net is unsound: execution reached a deadlock with tokens "
+                        f"in {deadlocked_places} but expected final marking "
+                        f"{{{list(self.final_marking.keys())[0].name}: {list(self.final_marking.values())[0]}}}. "
+                        f"This is likely caused by a modeling error in the original process model "
+                        f"(e.g. unsynchronized parallel branches missing an AND-join gateway)."
+                    )
                 continue
 
             for t in enabled: # t is a Transition object
@@ -186,13 +196,12 @@ class PetriNet(BaseModel):
                 next_trace = curr_trace
                 if t.label_for_trace is not None:
                     next_trace = curr_trace + (t.label_for_trace,)
-                
+
                 next_trans_names_path = curr_trans_names_path + (t.name,)
 
                 if next_marking == self.final_marking:
                     variants.add(next_trace)
-                
-                if next_marking != self.final_marking:
+                else:
                     if len(active) < 20000:
                         active.add((next_marking, next_trace, next_trans_names_path))
         return variants
@@ -444,10 +453,11 @@ class PetriNet(BaseModel):
         raise NotImplementedError("Attached events handling is not implemented yet.")
 
     def _silence_gateway_transitions(self):
+        from model_evaluation.json_to_pn import get_bpmn_element_type, BpmnElementType, GATEWAY_STENCIL_NAMES
         for t in self.transitions:
             if t.name in self.bpmn_id_to_stencil:
-                stencil = self.bpmn_id_to_stencil[t.name]
-                if "gateway" in stencil.lower():
+                stencil = self.bpmn_id_to_stencil[t.name].lower()
+                if "gateway" in stencil or stencil in GATEWAY_STENCIL_NAMES:
                     t.label_for_trace = None
 
     def _ensure_single_start_end_places_and_get_markings(self) -> Tuple[Marking, Marking]:

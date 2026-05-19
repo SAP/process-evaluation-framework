@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" xmlns:signavio="http://www.signavio.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="Signavio Process Editor, http://www.signavio.com" exporterVersion="17.6.1" expressionLanguage="http://www.w3.org/TR/XPath" id="sid-process-ls3" targetNamespace="http://www.signavio.com" typeLanguage="http://www.w3.org/2001/XMLSchema" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
+   <process id="sid-proc-a" isClosed="false" isExecutable="false" processType="None">
+      <startEvent id="a-start" name="a0">
+         <outgoing>a-flow-1</outgoing>
+      </startEvent>
+      <task completionQuantity="1" id="a-task-1" isForCompensation="false" name="a1" startQuantity="1">
+         <incoming>a-flow-1</incoming>
+         <outgoing>a-flow-2</outgoing>
+      </task>
+      <task completionQuantity="1" id="a-task-2" isForCompensation="false" name="a2" startQuantity="1">
+         <incoming>a-flow-2</incoming>
+         <outgoing>a-flow-3</outgoing>
+      </task>
+      <task completionQuantity="1" id="a-task-3" isForCompensation="false" name="a3" startQuantity="1">
+         <incoming>a-flow-3</incoming>
+         <outgoing>a-flow-4</outgoing>
+      </task>
+      <task completionQuantity="1" id="a-task-4" isForCompensation="false" name="a4" startQuantity="1">
+         <incoming>a-flow-4</incoming>
+         <outgoing>a-flow-5</outgoing>
+      </task>
+      <endEvent id="a-end" name="a5">
+         <incoming>a-flow-5</incoming>
+      </endEvent>
+      <sequenceFlow id="a-flow-1" sourceRef="a-start" targetRef="a-task-1"/>
+      <sequenceFlow id="a-flow-2" sourceRef="a-task-1" targetRef="a-task-2"/>
+      <sequenceFlow id="a-flow-3" sourceRef="a-task-2" targetRef="a-task-3"/>
+      <sequenceFlow id="a-flow-4" sourceRef="a-task-3" targetRef="a-task-4"/>
+      <sequenceFlow id="a-flow-5" sourceRef="a-task-4" targetRef="a-end"/>
+   </process>
+   <bpmndi:BPMNDiagram id="a-diagram">
+      <bpmndi:BPMNPlane bpmnElement="sid-proc-a" id="a-plane">
+         <bpmndi:BPMNShape bpmnElement="a-start" id="a-start_gui">
+            <omgdc:Bounds height="30.0" width="30.0" x="270.0" y="550.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="a-task-1" id="a-task-1_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="345.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="a-task-2" id="a-task-2_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="490.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="a-task-3" id="a-task-3_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="635.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="a-task-4" id="a-task-4_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="780.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="a-end" id="a-end_gui">
+            <omgdc:Bounds height="28.0" width="28.0" x="925.0" y="551.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNEdge bpmnElement="a-flow-1" id="a-flow-1_gui">
+            <omgdi:waypoint x="300.0" y="565.0"/>
+            <omgdi:waypoint x="345.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="a-flow-2" id="a-flow-2_gui">
+            <omgdi:waypoint x="445.0" y="565.0"/>
+            <omgdi:waypoint x="490.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="a-flow-3" id="a-flow-3_gui">
+            <omgdi:waypoint x="590.0" y="565.0"/>
+            <omgdi:waypoint x="635.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="a-flow-4" id="a-flow-4_gui">
+            <omgdi:waypoint x="735.0" y="565.0"/>
+            <omgdi:waypoint x="780.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="a-flow-5" id="a-flow-5_gui">
+            <omgdi:waypoint x="880.0" y="565.0"/>
+            <omgdi:waypoint x="925.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+      </bpmndi:BPMNPlane>
+   </bpmndi:BPMNDiagram>
+</definitions>
