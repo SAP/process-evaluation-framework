@@ -143,3 +143,4 @@ Data/*
 
 poetry.lock
 poetry.toml
+docs/plans/

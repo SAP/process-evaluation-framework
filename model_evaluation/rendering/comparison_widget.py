@@ -18,7 +18,11 @@ from model_evaluation.BPMN_conversion import BPMNConverter
 from model_evaluation.XML_conversion import XMLBPMNConverter
 from model_evaluation.bpmn_normalization import normalize_atomic_names
 from model_evaluation.bpmn_similarity import calculate_bpmn_similarity
-from model_evaluation.trace_extraction import extract_traces, calculate_trace_similarity
+from model_evaluation.petri import SoundnessStatus
+from model_evaluation.trace_extraction import (
+    calculate_trace_similarity,
+    extract_traces,
+)
 from model_evaluation.utils import cosine_sim_optimized
 
 CATEGORY_COLORS = {
@@ -52,6 +56,73 @@ v.importXML(xml).then(function(){{v.get('canvas').zoom('fit-viewport','auto');}}
 }});</script></body></html>"""
     html_b64 = base64.b64encode(html_doc.encode("utf-8")).decode("utf-8")
     return f'<iframe src="data:text/html;base64,{html_b64}" width="100%" height="{height_px}px" frameborder="0"></iframe>'
+
+
+def _trace_scores_html(res_1, res_2, tj, td, to):
+    return (
+        f"<table style='border-collapse:collapse; font-size:13px;'>"
+        f"<tr><td style='padding:4px 8px;'>Sound traces Model 1</td><td style='padding:4px 8px;'><b>{len(res_1.variants)}</b>"
+        f"{f' + {len(res_1.partial_traces)} partial' if res_1.partial_traces else ''}</td></tr>"
+        f"<tr><td style='padding:4px 8px;'>Sound traces Model 2</td><td style='padding:4px 8px;'><b>{len(res_2.variants)}</b>"
+        f"{f' + {len(res_2.partial_traces)} partial' if res_2.partial_traces else ''}</td></tr>"
+        f"<tr><td style='padding:4px 8px;'>Jaccard</td><td style='padding:4px 8px;'>{tj:.1%}</td></tr>"
+        f"<tr><td style='padding:4px 8px;'>Dice</td><td style='padding:4px 8px;'>{td:.1%}</td></tr>"
+        f"<tr><td style='padding:4px 8px;'>Overlap</td><td style='padding:4px 8px;'>{to:.1%}</td></tr>"
+        f"</table>"
+    )
+
+
+def _per_model_diagnostics_html(label, diag):
+    if diag.status == SoundnessStatus.SOUND:
+        return (f"<li><b>{label}:</b> "
+                f"<span style='color:#27ae60;'>sound</span> "
+                f"({diag.sound_variant_count} variant(s))</li>")
+
+    body_parts = [f"<li><b>{label}:</b> "
+                  f"<span style='color:#c0392b;'>{diag.status.value}</span> — {diag.summary}"]
+
+    if diag.deadlock_markings:
+        body_parts.append("<ul style='margin:4px 0 0 16px;'>")
+        for sig in diag.deadlock_markings[:5]:
+            tokens_str = ", ".join(f"{name}:{count}" for name, count in sig.tokens)
+            example = " → ".join(sig.example_partial_trace) or "<empty>"
+            body_parts.append(
+                f"<li>tokens stuck at <code>{{{tokens_str}}}</code>; "
+                f"e.g. partial trace <code>{example}</code></li>"
+            )
+        if len(diag.deadlock_markings) > 5:
+            body_parts.append(f"<li>… {len(diag.deadlock_markings) - 5} more</li>")
+        body_parts.append("</ul>")
+
+    if diag.structural_findings:
+        body_parts.append(
+            f"<details style='margin:4px 0 0 0;'>"
+            f"<summary>Structural findings ({len(diag.structural_findings)})</summary>"
+            f"<ul style='margin:4px 0 0 16px; font-size:12px;'>"
+        )
+        for f in diag.structural_findings[:20]:
+            node_part = f" <code>{f.node_id}</code>" if f.node_id else ""
+            body_parts.append(f"<li><b>{f.issue}</b>{node_part}: {f.detail}</li>")
+        if len(diag.structural_findings) > 20:
+            body_parts.append(f"<li>… {len(diag.structural_findings) - 20} more</li>")
+        body_parts.append("</ul></details>")
+
+    body_parts.append("</li>")
+    return "".join(body_parts)
+
+
+def _diagnostics_panel_html(label_1, res_1, label_2, res_2):
+    if res_1.is_sound and res_2.is_sound:
+        return ""
+    return (
+        "<div style='margin-top:10px; padding:10px 14px; "
+        "background:#fff8e1; border-left:4px solid #f39c12; border-radius:4px;'>"
+        "<b>⚠ Behavioral comparison includes partial results</b>"
+        "<ul style='margin:6px 0 0 16px; padding:0;'>"
+        + _per_model_diagnostics_html(label_1, res_1.diagnostics)
+        + _per_model_diagnostics_html(label_2, res_2.diagnostics)
+        + "</ul></div>"
+    )
 
 
 def _model_summary_html(name, m):
@@ -312,25 +383,20 @@ def create_comparison_widget(example_dir="../examples"):
 
         trace_sim = None
         try:
-            traces_1 = extract_traces(m1,      timeout_seconds=trace_timeout_slider.value,
-                                      max_loop_depth=loop_depth_slider.value)
-            traces_2 = extract_traces(m2_norm, timeout_seconds=trace_timeout_slider.value,
-                                      max_loop_depth=loop_depth_slider.value)
-            tj = calculate_trace_similarity(list(traces_1), list(traces_2), method="jaccard")
-            td = calculate_trace_similarity(list(traces_1), list(traces_2), method="dice")
-            to = calculate_trace_similarity(list(traces_1), list(traces_2), method="overlap")
+            res_1 = extract_traces(m1,      timeout_seconds=trace_timeout_slider.value,
+                                   max_loop_depth=loop_depth_slider.value)
+            res_2 = extract_traces(m2_norm, timeout_seconds=trace_timeout_slider.value,
+                                   max_loop_depth=loop_depth_slider.value)
+            tj = calculate_trace_similarity(res_1, res_2, method="jaccard")
+            td = calculate_trace_similarity(res_1, res_2, method="dice")
+            to = calculate_trace_similarity(res_1, res_2, method="overlap")
             trace_sim = tj
-            traces_html = (
-                f"<table style='border-collapse:collapse; font-size:13px;'>"
-                f"<tr><td style='padding:4px 8px;'>Traces Model 1</td><td style='padding:4px 8px;'><b>{len(traces_1)}</b></td></tr>"
-                f"<tr><td style='padding:4px 8px;'>Traces Model 2</td><td style='padding:4px 8px;'><b>{len(traces_2)}</b></td></tr>"
-                f"<tr><td style='padding:4px 8px;'>Jaccard</td><td style='padding:4px 8px;'>{tj:.1%}</td></tr>"
-                f"<tr><td style='padding:4px 8px;'>Dice</td><td style='padding:4px 8px;'>{td:.1%}</td></tr>"
-                f"<tr><td style='padding:4px 8px;'>Overlap</td><td style='padding:4px 8px;'>{to:.1%}</td></tr>"
-                f"</table>"
+            traces_html = _trace_scores_html(res_1, res_2, tj, td, to)
+            traces_html += _diagnostics_panel_html(
+                dropdown_1.value, res_1, dropdown_2.value, res_2
             )
         except Exception as e:
-            traces_html = f"<p style='color:orange;'>Trace extraction failed: {e}</p>"
+            traces_html = f"<p style='color:red;'>Unexpected error during trace extraction: {e}</p>"
 
         _state.update({
             "result":      result,

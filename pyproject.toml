@@ -39,6 +39,13 @@ matplotlib = "^3.10.7"
 lxml = "^6.0.2"
 pydantic = "^2.13.4"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["model_evaluation"]
+
 
 [build-system]
 requires = ["poetry-core"]
