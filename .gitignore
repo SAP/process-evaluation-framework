@@ -142,3 +142,5 @@ Data/*
 
 poetry.lock
 poetry.toml
+
+examples/testing_models/

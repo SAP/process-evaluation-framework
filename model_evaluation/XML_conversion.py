@@ -42,6 +42,7 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
 from BPMN_conversion import BPMNModel
+from bpmn_schema import derive_parent_subprocess, validate_simplified_bpmn
 
 # == BPMN namespace ==============================================================
 
@@ -450,9 +451,15 @@ class XMLBPMNConverter:
 
         1. Compute lane elemRefs from the temporary parent_lane attribute.
         2. Remove parent_lane from all elements.
+        3. Derive parent_subprocess back-refs from elemRefs.
+        4. Validate the canonical subprocess invariant in __debug__.
         """
         cls._link_elements_to_lanes(model)
         cls._remove_parent_lane_references(model)
+        derive_parent_subprocess(model.to_dict())
+        if __debug__:
+            issues = validate_simplified_bpmn(model.to_dict())
+            assert not issues, "XMLBPMNConverter produced invalid simplified JSON:\n  - " + "\n  - ".join(issues)
 
     @classmethod
     def _link_elements_to_lanes(cls, model: BPMNModel) -> None:
