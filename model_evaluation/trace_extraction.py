@@ -13,7 +13,7 @@ emitted via the ``model_evaluation.trace_extraction`` logger per non-sound net.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 from petri import (
     ExplorationDiagnostics,
@@ -22,7 +22,6 @@ from petri import (
     SoundnessStatus,
     StructuralFinding,
 )
-from utils import dice_list, jaccard_list, overlap_list
 
 
 logger = logging.getLogger(__name__)
@@ -54,15 +53,31 @@ class TraceExtractionResult:
         return self.variants + self.partial_traces
 
 
-# Public type alias: most similarity helpers accept either raw traces or a
-# TraceExtractionResult. Centralised here so callers can refer to it.
-TracesOrResult = Union[List[List[str]], TraceExtractionResult]
+def _coerce_to_trace_list(arg) -> List[List[str]]:
+    """Local copy of the trace coercion helper.
 
-
-def _coerce_to_trace_list(arg: TracesOrResult) -> List[List[str]]:
+    The canonical version lives in ``bpmn_similarity`` next to
+    :func:`calculate_trace_similarity`; this duplicate exists so
+    ``compare_trace_sets`` (a reporting helper) does not need to import from
+    ``bpmn_similarity`` at module load time.
+    """
     if isinstance(arg, TraceExtractionResult):
         return arg.all_traces()
     return arg
+
+
+def __getattr__(name):
+    """Lazy backward-compatible re-export.
+
+    ``calculate_trace_similarity`` was moved to :mod:`bpmn_similarity`. To keep
+    existing ``from trace_extraction import calculate_trace_similarity`` imports
+    working, resolve it lazily here. Lazy resolution avoids a circular import
+    at module load time (``bpmn_similarity`` imports from this module).
+    """
+    if name == "calculate_trace_similarity":
+        from bpmn_similarity import calculate_trace_similarity as _cts
+        return _cts
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _format_summary(diag: ExplorationDiagnostics) -> str:
@@ -151,44 +166,6 @@ def extract_traces(
     )
 
 
-def calculate_trace_similarity(
-    traces_1: TracesOrResult,
-    traces_2: TracesOrResult,
-    method: str = "jaccard"
-) -> float:
-    """Calculate similarity between two sets of traces.
-
-    Args:
-        traces_1: First set of traces, or a :class:`TraceExtractionResult`.
-        traces_2: Second set of traces, or a :class:`TraceExtractionResult`.
-        method: Similarity metric – ``"jaccard"`` (default), ``"dice"``, or
-            ``"overlap"`` (overlap coefficient, computed locally)
-
-    Returns:
-        Similarity score between 0.0 and 1.0. When given
-        :class:`TraceExtractionResult` arguments, similarity is computed over
-        the union of sound variants and partial traces from each side.
-    """
-    list_1 = _coerce_to_trace_list(traces_1)
-    list_2 = _coerce_to_trace_list(traces_2)
-
-    set_1 = list({tuple(trace) for trace in list_1})
-    set_2 = list({tuple(trace) for trace in list_2})
-
-    if method == "jaccard":
-        score, _ = jaccard_list(set_1, set_2)
-        return score
-    elif method == "dice":
-        score, _ = dice_list(set_1, set_2)
-        return score
-    elif method == "overlap":
-        score, _ = overlap_list(set_1, set_2)
-        return score
-    else:
-        raise ValueError(f"Unknown similarity method: {method}")
-
-
-
 def get_trace_statistics(traces: List[List[str]]) -> Dict[str, Any]:
     """Calculate statistics about a set of traces.
 
@@ -223,8 +200,8 @@ def get_trace_statistics(traces: List[List[str]]) -> Dict[str, Any]:
 
 
 def compare_trace_sets(
-    traces_1: TracesOrResult,
-    traces_2: TracesOrResult,
+    traces_1,
+    traces_2,
     model_1_name: str = "Model 1",
     model_2_name: str = "Model 2"
 ) -> Dict[str, Any]:
@@ -242,6 +219,11 @@ def compare_trace_sets(
         contains ``model_1_diagnostics`` and ``model_2_diagnostics`` so the
         caller can render warnings for unsound nets.
     """
+    # Lazy import: ``calculate_trace_similarity`` lives in ``bpmn_similarity``,
+    # which itself imports from this module. Importing it here keeps the
+    # top-level dependency one-way (bpmn_similarity → trace_extraction).
+    from bpmn_similarity import calculate_trace_similarity
+
     list_1 = _coerce_to_trace_list(traces_1)
     list_2 = _coerce_to_trace_list(traces_2)
 
