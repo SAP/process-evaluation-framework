@@ -1,10 +1,66 @@
 import collections
 import time
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from model_evaluation.json_to_pn import parse_simplified_bpmn_json, get_bpmn_element_type, is_bpmn_element_relevant_for_pn, is_bpmn_choice_gateway, get_direct_preset_bpmn_ids, get_direct_postset_bpmn_ids, BpmnElementType
+
+
+class SoundnessStatus(str, Enum):
+    """Outcome of trace extraction relative to workflow-net soundness.
+
+    A net is ``SOUND`` only when every explored execution reached the final
+    marking exactly. The other statuses describe the kind of degradation.
+    """
+
+    SOUND = "sound"
+    UNSOUND_RECOVERED = "unsound_recovered"
+    UNSOUND_NO_VARIANTS = "unsound_no_variants"
+    STRUCTURALLY_BROKEN = "structurally_broken"
+    EXPLORATION_TRUNCATED = "exploration_truncated"
+
+
+# Structural-finding issue codes considered severe enough to flip the overall
+# status to STRUCTURALLY_BROKEN when no sound variants were produced.
+SEVERE_STRUCTURAL_ISSUES: frozenset[str] = frozenset({
+    "no_source_place",
+    "no_sink_place",
+})
+
+
+@dataclass(frozen=True)
+class StructuralFinding:
+    issue: str
+    detail: str
+    node_id: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class DeadlockSignature:
+    """Deduplicated representation of a dead non-final marking.
+
+    ``tokens`` is sorted so two deadlocks with the same place→count map hash
+    equal regardless of the order they were discovered in.
+    """
+
+    tokens: Tuple[Tuple[str, int], ...]
+    example_partial_trace: Tuple[str, ...]
+
+
+@dataclass
+class ExplorationDiagnostics:
+    status: SoundnessStatus = SoundnessStatus.SOUND
+    summary: str = ""
+    structural_findings: List[StructuralFinding] = field(default_factory=list)
+    deadlock_markings: List[DeadlockSignature] = field(default_factory=list)
+    loop_cap_hits: Dict[str, int] = field(default_factory=dict)
+    truncated_by_active_cap: bool = False
+    truncated_by_timeout: bool = False
+    sound_variant_count: int = 0
+    partial_trace_count: int = 0
 
 
 
@@ -111,10 +167,118 @@ class PetriNet(BaseModel):
             return existing_arc
 
         self.arcs.add(arc)
-        source.out_arcs.add(arc) 
-        target.in_arcs.add(arc) 
+        source.out_arcs.add(arc)
+        target.in_arcs.add(arc)
         return arc
-    
+
+    def structural_check(self) -> List[StructuralFinding]:
+        """Run lightweight structural checks for workflow-net soundness.
+
+        These checks are O(|V|+|E|) and deliberately conservative: they catch
+        common BPMN modeling errors (missing source/sink, isolated nodes, dead
+        transitions, unreachable subgraphs) but make no claims about full
+        WF-net soundness, which requires a coverability-graph analysis.
+
+        Findings are advisory: the caller may still attempt exploration even
+        when severe issues are reported.
+        """
+        findings: List[StructuralFinding] = []
+
+        sources = {p for p in self.places if not p.in_arcs}
+        sinks = {p for p in self.places if not p.out_arcs}
+
+        if not sources:
+            findings.append(StructuralFinding(
+                issue="no_source_place",
+                detail="No place without incoming arcs was found; the net has no entry point.",
+            ))
+        elif len(sources) > 1:
+            for src in sources:
+                findings.append(StructuralFinding(
+                    issue="multiple_source_places",
+                    detail=f"Place '{src.name}' is one of {len(sources)} source places; a workflow net should have exactly one.",
+                    node_id=src.name,
+                ))
+
+        if not sinks:
+            findings.append(StructuralFinding(
+                issue="no_sink_place",
+                detail="No place without outgoing arcs was found; the net has no exit point.",
+            ))
+        elif len(sinks) > 1:
+            for snk in sinks:
+                findings.append(StructuralFinding(
+                    issue="multiple_sink_places",
+                    detail=f"Place '{snk.name}' is one of {len(sinks)} sink places; a workflow net should have exactly one.",
+                    node_id=snk.name,
+                ))
+
+        # Forward reachability from sources.
+        reachable_forward: Set[Union[Place, Transition]] = set()
+        if sources:
+            stack: List[Union[Place, Transition]] = list(sources)
+            while stack:
+                node = stack.pop()
+                if node in reachable_forward:
+                    continue
+                reachable_forward.add(node)
+                for arc in node.out_arcs:
+                    if arc.target not in reachable_forward:
+                        stack.append(arc.target)
+
+            for node in self.places | self.transitions:
+                if node not in reachable_forward:
+                    findings.append(StructuralFinding(
+                        issue="unreachable_from_source",
+                        detail=f"Node '{node.name}' is not reachable from any source place.",
+                        node_id=node.name,
+                    ))
+
+        # Backward reachability from sinks (can the sink be reached?).
+        reachable_backward: Set[Union[Place, Transition]] = set()
+        if sinks:
+            stack = list(sinks)
+            while stack:
+                node = stack.pop()
+                if node in reachable_backward:
+                    continue
+                reachable_backward.add(node)
+                for arc in node.in_arcs:
+                    if arc.source not in reachable_backward:
+                        stack.append(arc.source)
+
+            for node in self.places | self.transitions:
+                if node not in reachable_backward:
+                    findings.append(StructuralFinding(
+                        issue="cannot_reach_sink",
+                        detail=f"Node '{node.name}' cannot reach any sink place.",
+                        node_id=node.name,
+                    ))
+
+        for node in self.places | self.transitions:
+            if not node.in_arcs and not node.out_arcs:
+                findings.append(StructuralFinding(
+                    issue="isolated_node",
+                    detail=f"Node '{node.name}' has neither incoming nor outgoing arcs.",
+                    node_id=node.name,
+                ))
+
+        for t in self.transitions:
+            if not t.in_arcs:
+                findings.append(StructuralFinding(
+                    issue="dead_transition_no_preset",
+                    detail=f"Transition '{t.name}' has no input places and can never fire.",
+                    node_id=t.name,
+                ))
+            elif not t.out_arcs:
+                findings.append(StructuralFinding(
+                    issue="dead_transition_no_postset",
+                    detail=f"Transition '{t.name}' has no output places.",
+                    node_id=t.name,
+                ))
+
+        return findings
+
     def is_enabled(self, transition: Transition, marking: Marking) -> bool:
         if transition not in self.transitions:
             return False
@@ -150,16 +314,44 @@ class PetriNet(BaseModel):
         return enabled
     
 
-    def net_variants(self, time_out_sec: float = 1.0, max_loop_depth: int = 3) -> Set[Tuple[str, ...]]:
+    def net_variants(
+        self,
+        time_out_sec: float = 1.0,
+        max_loop_depth: int = 3,
+    ) -> Tuple[Set[Tuple[str, ...]], Set[Tuple[str, ...]], ExplorationDiagnostics]:
+        """Explore the reachability graph and collect execution traces.
+
+        Returns a 3-tuple ``(variants, partial_traces, diagnostics)``:
+
+        - ``variants`` are traces that reached the final marking exactly.
+        - ``partial_traces`` are prefixes that ended in a non-final dead
+          marking (a structural deadlock) or were cut off when a transition
+          was about to be fired beyond ``max_loop_depth`` iterations.
+        - ``diagnostics`` carries deduplicated deadlock signatures, loop-cap
+          counters, and truncation flags. The caller is expected to set the
+          final ``status`` field after merging in any structural findings.
+
+        This method never raises on unsound nets. Genuine programmer errors
+        (e.g. invalid transitions) still propagate.
+        """
         active: Set[Tuple[Marking, Tuple[str, ...], Tuple[str, ...]]] = set()
         active.add((self.initial_marking, tuple(), tuple()))
 
         variants: Set[Tuple[str, ...]] = set()
+        partial_traces: Set[Tuple[str, ...]] = set()
+        # Keyed by tokens so two deadlocks with the same place→count map dedupe;
+        # the value preserves one example partial trace for diagnostics.
+        deadlock_index: Dict[Tuple[Tuple[str, int], ...], Tuple[str, ...]] = {}
+        loop_cap_hits: Dict[str, int] = {}
+        truncated_by_active_cap = False
+        truncated_by_timeout = False
+
         start_time: float = time.monotonic()
         visited_states: Set[Tuple[Marking, Tuple[str, ...]]] = set()
 
         while active:
             if time.monotonic() - start_time > time_out_sec:
+                truncated_by_timeout = True
                 break
 
             curr_marking, curr_trace, curr_trans_names_path = active.pop()
@@ -175,18 +367,16 @@ class PetriNet(BaseModel):
                 if curr_marking == self.final_marking:
                     variants.add(curr_trace)
                 else:
-                    deadlocked_places = {p.name: n for p, n in curr_marking.items()}
-                    raise ValueError(
-                        f"Workflow net is unsound: execution reached a deadlock with tokens "
-                        f"in {deadlocked_places} but expected final marking "
-                        f"{{{list(self.final_marking.keys())[0].name}: {list(self.final_marking.values())[0]}}}. "
-                        f"This is likely caused by a modeling error in the original process model "
-                        f"(e.g. unsynchronized parallel branches missing an AND-join gateway)."
-                    )
+                    tokens = tuple(sorted((p.name, c) for p, c in curr_marking.items()))
+                    deadlock_index.setdefault(tokens, curr_trace)
+                    partial_traces.add(curr_trace)
                 continue
 
-            for t in enabled: # t is a Transition object
+            for t in enabled:
                 if curr_trans_names_path.count(t.name) >= max_loop_depth:
+                    loop_cap_hits[t.name] = loop_cap_hits.get(t.name, 0) + 1
+                    # The current prefix is what we have; record it as partial.
+                    partial_traces.add(curr_trace)
                     continue
 
                 next_marking = self.execute(t, curr_marking)
@@ -204,9 +394,28 @@ class PetriNet(BaseModel):
                 else:
                     if len(active) < 20000:
                         active.add((next_marking, next_trace, next_trans_names_path))
-        return variants
-    
-    def to_variant_event_log(self, time_out_sec: float = 1.0, max_loop_depth: int = 3):
+                    else:
+                        truncated_by_active_cap = True
+
+        diagnostics = ExplorationDiagnostics(
+            deadlock_markings=[
+                DeadlockSignature(tokens=tokens, example_partial_trace=example)
+                for tokens, example in deadlock_index.items()
+            ],
+            loop_cap_hits=loop_cap_hits,
+            truncated_by_active_cap=truncated_by_active_cap,
+            truncated_by_timeout=truncated_by_timeout,
+            sound_variant_count=len(variants),
+            partial_trace_count=len(partial_traces),
+        )
+        return variants, partial_traces, diagnostics
+
+    def to_variant_event_log(
+        self,
+        time_out_sec: float = 1.0,
+        max_loop_depth: int = 3,
+    ) -> Tuple[Set[Tuple[str, ...]], Set[Tuple[str, ...]], ExplorationDiagnostics]:
+        """Alias for :meth:`net_variants` retained for the legacy name."""
         return self.net_variants(time_out_sec, max_loop_depth)
     
 
@@ -269,7 +478,7 @@ class PetriNet(BaseModel):
                     potential_actual_label = task_label_in_bpmn[len(stencil):].strip()
                     if potential_actual_label.startswith("(") and potential_actual_label.endswith(")"):
                         task_label_in_bpmn = potential_actual_label[1:-1].strip()
-                self._create_pn_transition(name=bpmn_id, label_for_trace=bpmn_id)
+                self._create_pn_transition(name=bpmn_id, label_for_trace=task_label_in_bpmn or bpmn_id)
                 
                 preset_count = len(get_direct_preset_bpmn_ids(bpmn_id, follows, self.bpmn_id_to_stencil, self.all_bpmn_ids_in_model))
                 if preset_count > 1:
@@ -425,7 +634,7 @@ class PetriNet(BaseModel):
             bpmn_event_id = p_old_event_place.name
             
             p_in = self._create_pn_place(name=f"pin_{bpmn_event_id}")
-            t_event = self._create_pn_transition(name=f"t_{bpmn_event_id}", label_for_trace=bpmn_event_id)
+            t_event = self._create_pn_transition(name=f"t_{bpmn_event_id}", label_for_trace=self.bpmn_id_to_label.get(bpmn_event_id) or bpmn_event_id)
             p_out = self._create_pn_place(name=f"pout_{bpmn_event_id}")
 
             self.add_arc_from_to(p_in, t_event)

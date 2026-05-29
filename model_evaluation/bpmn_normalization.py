@@ -408,6 +408,15 @@ def normalize_atomic_names(model1, model2, similarity_func, threshold=0.7):
         >>> similarity = calculate_bpmn_similarity(
         ...     ground_truth_model, model2_aligned, method="dice"
         ... )
+        >>> # Or include behavioral (trace-based) similarity in the same call:
+        >>> similarity = calculate_bpmn_similarity(
+        ...     ground_truth_model,
+        ...     model2_aligned,
+        ...     method="dice",
+        ...     behavioral=True,
+        ... )
+        >>> similarity["behavioral"]            # high-level behavioral score
+        >>> similarity["behavioral_metric_used"]  # "dice" or "jaccard"
     """
     mappings = create_all_atomic_mappings(model1, model2, similarity_func, threshold)
     model2_aligned = apply_atomic_name_mapping(model2, mappings)
