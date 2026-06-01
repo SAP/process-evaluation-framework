@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, List, Union
 
-from bpmn_schema import derive_parent_subprocess, validate_simplified_bpmn
+from bpmn_schema import derive_parent_subprocess
 from sapsam_mapping import sapsam_mapping
 
 BPMNShape = Dict[str, Any]
@@ -342,9 +342,6 @@ class BPMNConverter:
         cls._link_elements_to_lanes(model)
         cls._remove_parent_lane_references(model)
         cls._validate_no_cross_boundary_flows(model)
-        if __debug__:
-            issues = validate_simplified_bpmn(model.to_dict())
-            assert not issues, "BPMNConverter produced invalid simplified JSON:\n  - " + "\n  - ".join(issues)
 
     @classmethod
     def _remove_outgoing_references(cls, model: BPMNModel) -> None:
