@@ -42,7 +42,6 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
 from BPMN_conversion import BPMNModel
-from bpmn_schema import derive_parent_subprocess
 
 # == BPMN namespace ==============================================================
 
@@ -373,7 +372,7 @@ class XMLBPMNConverter:
                         child,
                         model,
                         element_to_lane={},          # no lanes inside a subprocess
-                        parent_subprocess=elem["name"] or eid,
+                        parent_subprocess=eid,
                         collect_to=sub,
                     )
                     elem["elemRefs"] = [
@@ -451,11 +450,9 @@ class XMLBPMNConverter:
 
         1. Compute lane elemRefs from the temporary parent_lane attribute.
         2. Remove parent_lane from all elements.
-        3. Derive parent_subprocess back-refs from elemRefs.
         """
         cls._link_elements_to_lanes(model)
         cls._remove_parent_lane_references(model)
-        derive_parent_subprocess(model.to_dict())
 
     @classmethod
     def _link_elements_to_lanes(cls, model: BPMNModel) -> None:

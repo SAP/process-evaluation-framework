@@ -1,7 +1,6 @@
 import json
 from typing import Any, Dict, List, Union
 
-from bpmn_schema import derive_parent_subprocess
 from sapsam_mapping import sapsam_mapping
 
 BPMNShape = Dict[str, Any]
@@ -149,7 +148,7 @@ class BPMNConverter:
                         sequence_flows=sub_seq,
                         message_flows=[],
                         parent_lane=parent_lane,
-                        parent_subprocess=elem["name"] or elem["id"]
+                        parent_subprocess=elem["id"]
                     )
                     for a in sub_acts:
                         if a["id"] not in {e["id"] for e in model.activities}:
@@ -337,7 +336,6 @@ class BPMNConverter:
     def _finalize_model(cls, model: BPMNModel) -> None:
         cls._connect_flows(model)  # set sourceRef for sequence/message flows
         cls._reorganize_subprocess_flows(model)  # move internal flows to subprocessSequenceFlows
-        derive_parent_subprocess(model.to_dict())  # in-place: stamp back-refs from elemRefs
         cls._remove_outgoing_references(model)
         cls._link_elements_to_lanes(model)
         cls._remove_parent_lane_references(model)
