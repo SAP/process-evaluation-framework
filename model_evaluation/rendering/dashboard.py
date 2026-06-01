@@ -31,6 +31,7 @@ CATEGORY_COLORS = {
     "flows": "#2ecc71",       # Green
     "organizational": "#f39c12",  # Orange
     "subprocess": "#9b59b6",  # Purple
+    "behavioral": "#e74c3c",  # Red
 }
 
 
@@ -45,7 +46,9 @@ class BPMNSimilarityDashboard:
         calculate_similarity_func,
         normalize_func,
         initial_threshold=0.7,
-        initial_method="dice"
+        initial_method="dice",
+        initial_trace_timeout=5.0,
+        initial_max_loop_depth=3,
     ):
         """
         Initialize the dashboard.
@@ -54,10 +57,17 @@ class BPMNSimilarityDashboard:
             model_1: Reference BPMN model (ground truth)
             model_2: BPMN model to compare
             similarity_func: String similarity function for normalization
-            calculate_similarity_func: Function to calculate BPMN similarity
+            calculate_similarity_func: Function to calculate BPMN similarity.
+                Must accept ``behavioral=``, ``trace_timeout_seconds=``,
+                ``max_loop_depth=`` keyword args (matches
+                ``calculate_bpmn_similarity``'s contract).
             normalize_func: Function to normalize atomic names
             initial_threshold: Initial normalization threshold (default: 0.7)
             initial_method: Initial similarity method (default: "dice")
+            initial_trace_timeout: Initial trace-extraction timeout in seconds
+                (default: 5.0)
+            initial_max_loop_depth: Initial max loop depth for trace extraction
+                (default: 3)
         """
         self.model_1 = model_1
         self.model_2 = model_2
@@ -67,12 +77,16 @@ class BPMNSimilarityDashboard:
 
         self.current_metric = initial_method
         self.current_threshold = initial_threshold
+        self.current_trace_timeout = initial_trace_timeout
+        self.current_max_loop_depth = initial_max_loop_depth
 
         # Store the threshold used for initial normalization (for comparison later)
         # This is the FIX: we compare against this, not self.current_threshold
         self._normalized_with_threshold = initial_threshold
 
-        # Cache for results: (metric, threshold) -> (normalized_model, result)
+        # Cache for results: (metric, threshold, trace_timeout, max_loop_depth)
+        # → (normalized_model, result). Behavioral is always on in the dashboard,
+        # so it isn't part of the key.
         self.results_cache = {}
 
         # Initial normalization and calculation
@@ -80,13 +94,21 @@ class BPMNSimilarityDashboard:
             model_1, model_2, similarity_func, threshold=initial_threshold
         )
 
-        # Initial calculation
+        # Initial calculation — behavioral is always on so the dashboard can
+        # render the fifth category bar. Default behavioral weight is 0%, so
+        # the overall score remains identical to a structural-only computation
+        # until the user moves the slider.
         self.base_result = calculate_similarity_func(
-            model_1, self.model_2_normalized, method=initial_method
+            model_1,
+            self.model_2_normalized,
+            method=initial_method,
+            behavioral=True,
+            trace_timeout_seconds=initial_trace_timeout,
+            max_loop_depth=initial_max_loop_depth,
         )
-        self.results_cache[(initial_method, initial_threshold)] = (
-            self.model_2_normalized, self.base_result
-        )
+        self.results_cache[
+            (initial_method, initial_threshold, initial_trace_timeout, initial_max_loop_depth)
+        ] = (self.model_2_normalized, self.base_result)
 
         self.has_subprocess = self.base_result.get("has_expanded_subprocess", False)
         self.default_weights = self.base_result["weights_used"]
@@ -130,6 +152,32 @@ class BPMNSimilarityDashboard:
             disabled=not self.has_subprocess,
             style={'description_width': '100px'}
         )
+        # Behavioral starts at 0% so existing structural-only overall scores
+        # are preserved by default; users opt in by raising the slider.
+        self.behavioral_slider = widgets.FloatSlider(
+            value=self.default_weights.get("behavioral", 0.0) * 100,
+            min=0, max=100, step=1,
+            description="Behavioral (%):",
+            continuous_update=False,
+            style={'description_width': '100px'}
+        )
+
+        # Trace-extraction tuning
+        self.trace_timeout_slider = widgets.FloatSlider(
+            value=self.current_trace_timeout,
+            min=1.0, max=30.0, step=1.0,
+            description="Trace timeout (s):",
+            continuous_update=False,
+            readout_format=".0f",
+            style={'description_width': '100px'}
+        )
+        self.loop_depth_slider = widgets.IntSlider(
+            value=self.current_max_loop_depth,
+            min=1, max=6, step=1,
+            description="Max loop depth:",
+            continuous_update=False,
+            style={'description_width': '100px'}
+        )
 
         # Threshold slider
         self.threshold_slider = widgets.FloatSlider(
@@ -167,28 +215,35 @@ class BPMNSimilarityDashboard:
         )
         self.reset_button.on_click(self._reset_to_defaults)
 
-    def _normalize_weights(self, structural, flows, organizational, subprocess):
+    def _normalize_weights(self, structural, flows, organizational, subprocess, behavioral):
         """Normalize weights to sum to 1.0."""
         if not self.has_subprocess:
             subprocess = 0.0
-        total = structural + flows + organizational + subprocess
+        total = structural + flows + organizational + subprocess + behavioral
         if total == 0:
             return (
                 self.default_weights["structural"],
                 self.default_weights["flows"],
                 self.default_weights["organizational"],
-                self.default_weights["subprocess"]
+                self.default_weights["subprocess"],
+                self.default_weights.get("behavioral", 0.0),
             )
         return (
             structural / total,
             flows / total,
             organizational / total,
-            subprocess / total
+            subprocess / total,
+            behavioral / total,
         )
 
     def _get_result_for_metric_and_threshold(self, metric, threshold):
         """Get or calculate result for given metric and threshold."""
-        cache_key = (metric, threshold)
+        cache_key = (
+            metric,
+            threshold,
+            self.current_trace_timeout,
+            self.current_max_loop_depth,
+        )
 
         if cache_key not in self.results_cache:
             # FIX: Compare against _normalized_with_threshold (initial), not current_threshold
@@ -202,7 +257,14 @@ class BPMNSimilarityDashboard:
                 # Same as initial threshold, use cached normalized model
                 normalized = self.model_2_normalized
 
-            result = self.calculate_similarity(self.model_1, normalized, method=metric)
+            result = self.calculate_similarity(
+                self.model_1,
+                normalized,
+                method=metric,
+                behavioral=True,
+                trace_timeout_seconds=self.current_trace_timeout,
+                max_loop_depth=self.current_max_loop_depth,
+            )
             self.results_cache[cache_key] = (normalized, result)
 
         return self.results_cache[cache_key]
@@ -220,6 +282,14 @@ class BPMNSimilarityDashboard:
         """Handle threshold slider changes."""
         self.current_threshold = change["new"]
 
+    def _on_trace_timeout_change(self, change):
+        """Trace-extraction timeout changed — record it; cache key picks it up."""
+        self.current_trace_timeout = change["new"]
+
+    def _on_loop_depth_change(self, change):
+        """Max loop depth changed — record it; cache key picks it up."""
+        self.current_max_loop_depth = change["new"]
+
     def _recalculate(self, button):
         """Recalculate and update visualization."""
         # Get slider values (convert from percentage)
@@ -227,15 +297,17 @@ class BPMNSimilarityDashboard:
         flows = self.flows_slider.value / 100.0
         organizational = self.organizational_slider.value / 100.0
         subprocess = self.subprocess_slider.value / 100.0
+        behavioral = self.behavioral_slider.value / 100.0
 
         # Normalize weights
-        structural, flows, organizational, subprocess = self._normalize_weights(
-            structural, flows, organizational, subprocess
+        structural, flows, organizational, subprocess, behavioral = self._normalize_weights(
+            structural, flows, organizational, subprocess, behavioral
         )
 
         # Update sliders to show normalized values
         total = (self.structural_slider.value + self.flows_slider.value +
-                 self.organizational_slider.value + self.subprocess_slider.value)
+                 self.organizational_slider.value + self.subprocess_slider.value +
+                 self.behavioral_slider.value)
 
         normalized = False
         if abs(total - 100.0) > 1.0:
@@ -243,6 +315,7 @@ class BPMNSimilarityDashboard:
             self.flows_slider.value = flows * 100
             self.organizational_slider.value = organizational * 100
             self.subprocess_slider.value = subprocess * 100
+            self.behavioral_slider.value = behavioral * 100
             normalized = True
 
         with self.message_output:
@@ -250,7 +323,7 @@ class BPMNSimilarityDashboard:
             if normalized:
                 print("⚠️ Weights were normalized to sum to 100%")
 
-        self._update_visualization(structural, flows, organizational, subprocess)
+        self._update_visualization(structural, flows, organizational, subprocess, behavioral)
 
     def _reset_to_defaults(self, button):
         """Reset sliders to default weights."""
@@ -258,6 +331,7 @@ class BPMNSimilarityDashboard:
         self.flows_slider.value = self.default_weights["flows"] * 100
         self.organizational_slider.value = self.default_weights["organizational"] * 100
         self.subprocess_slider.value = self.default_weights["subprocess"] * 100
+        self.behavioral_slider.value = self.default_weights.get("behavioral", 0.0) * 100
 
         with self.message_output:
             clear_output(wait=True)
@@ -267,48 +341,69 @@ class BPMNSimilarityDashboard:
             self.default_weights["structural"],
             self.default_weights["flows"],
             self.default_weights["organizational"],
-            self.default_weights["subprocess"]
+            self.default_weights["subprocess"],
+            self.default_weights.get("behavioral", 0.0),
         )
 
-    def _update_visualization(self, structural, flows, organizational, subprocess):
+    def _update_visualization(self, structural, flows, organizational, subprocess, behavioral):
         """Update the visualization with current weights."""
         _, result = self._get_result_for_metric_and_threshold(
             self.current_metric, self.current_threshold
         )
+
+        behavioral_score = result.get("behavioral", 0.0)
+        behavioral_metric = result.get("behavioral_metric_used", "jaccard")
 
         # Calculate overall score with current weights
         overall = (
             result["high_level_scores"]["structural"] * structural +
             result["high_level_scores"]["flows"] * flows +
             result["high_level_scores"]["organizational"] * organizational +
-            result["high_level_scores"]["subprocess"] * subprocess
+            result["high_level_scores"]["subprocess"] * subprocess +
+            behavioral_score * behavioral
         )
 
         with self.output:
             clear_output(wait=True)
 
+            # Inline minimal diagnostics warning when either net is unsound.
+            # Render as a print so it lives in the same Output widget as the
+            # figure (no separate widgets.HTML required).
+            tr1 = result.get("trace_result_1")
+            tr2 = result.get("trace_result_2")
+            if tr1 is not None and tr2 is not None and not (tr1.is_sound and tr2.is_sound):
+                print("⚠ Behavioral comparison includes partial results")
+                print(f"   Model 1: {tr1.diagnostics.status.value} — {tr1.diagnostics.summary}")
+                print(f"   Model 2: {tr2.diagnostics.status.value} — {tr2.diagnostics.summary}")
+
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
             # === LEFT CHART: Weighted Category Scores ===
-            categories = ["Structural", "Flows", "Organizational", "Subprocess"]
+            categories = ["Structural", "Flows", "Organizational", "Subprocess", "Behavioral"]
             raw_scores = [
                 result["high_level_scores"]["structural"],
                 result["high_level_scores"]["flows"],
                 result["high_level_scores"]["organizational"],
                 result["high_level_scores"]["subprocess"],
+                behavioral_score,
             ]
 
             # Current weights and weighted scores
-            weights_vals = [structural, flows, organizational, subprocess]
+            weights_vals = [structural, flows, organizational, subprocess, behavioral]
             weighted_scores = [s * w for s, w in zip(raw_scores, weights_vals)]
 
-            # Equal weights for comparison
-            if self.has_subprocess:
-                equal_weight = 0.25
-            else:
-                equal_weight = 1.0 / 3.0
-            equal_weights_vals = [equal_weight, equal_weight, equal_weight,
-                                  equal_weight if self.has_subprocess else 0]
+            # Equal weights for comparison — split evenly across the categories
+            # that are "live" (subprocess only when there are expanded subprocesses;
+            # behavioral always counts since the dashboard always extracts traces).
+            live_count = 3 + int(self.has_subprocess) + 1  # +1 for behavioral
+            equal_weight = 1.0 / live_count
+            equal_weights_vals = [
+                equal_weight,
+                equal_weight,
+                equal_weight,
+                equal_weight if self.has_subprocess else 0,
+                equal_weight,
+            ]
             equal_weighted_scores = [s * w for s, w in zip(raw_scores, equal_weights_vals)]
             overall_equal = sum(equal_weighted_scores)
 
@@ -316,7 +411,8 @@ class BPMNSimilarityDashboard:
                 CATEGORY_COLORS["structural"],
                 CATEGORY_COLORS["flows"],
                 CATEGORY_COLORS["organizational"],
-                CATEGORY_COLORS["subprocess"]
+                CATEGORY_COLORS["subprocess"],
+                CATEGORY_COLORS["behavioral"],
             ]
             y_pos = np.arange(len(categories))
             bar_height = 0.35
@@ -367,7 +463,8 @@ class BPMNSimilarityDashboard:
                 "Activities", "Events", "Gateways",
                 "Seq Flows", "Msg Flows",
                 "Pool/Lane\nNames", "Pool/Lane\nElements",
-                "Subprocess\nNames", "Subprocess\nElements", "Subprocess\nFlows"
+                "Subprocess\nNames", "Subprocess\nElements", "Subprocess\nFlows",
+                f"Behavioral\n",
             ]
             element_scores = [
                 result["activity_names"],
@@ -380,12 +477,14 @@ class BPMNSimilarityDashboard:
                 result["subprocess_names"],
                 result["subprocess_elemrefs"],
                 result["subprocess_flows"],
+                behavioral_score,
             ]
             element_colors = (
                 [CATEGORY_COLORS["structural"]] * 3 +
                 [CATEGORY_COLORS["flows"]] * 2 +
                 [CATEGORY_COLORS["organizational"]] * 2 +
-                [CATEGORY_COLORS["subprocess"]] * 3
+                [CATEGORY_COLORS["subprocess"]] * 3 +
+                [CATEGORY_COLORS["behavioral"]]
             )
 
             y_pos2 = np.arange(len(elements))
@@ -407,6 +506,7 @@ class BPMNSimilarityDashboard:
                 mpatches.Patch(color=CATEGORY_COLORS["flows"], label="Flows"),
                 mpatches.Patch(color=CATEGORY_COLORS["organizational"], label="Organizational"),
                 mpatches.Patch(color=CATEGORY_COLORS["subprocess"], label="Subprocess"),
+                mpatches.Patch(color=CATEGORY_COLORS["behavioral"], label="Behavioral"),
             ]
             ax2.legend(handles=legend_patches, loc="best", fontsize=8)
 
@@ -415,12 +515,18 @@ class BPMNSimilarityDashboard:
 
     def display(self):
         """Display the dashboard."""
+        # Wire trace-extraction sliders so the cache key always reflects the
+        # current values without forcing a recalculate-on-every-tick.
+        self.trace_timeout_slider.observe(self._on_trace_timeout_change, names="value")
+        self.loop_depth_slider.observe(self._on_loop_depth_change, names="value")
+
         # Initial visualization
         self._update_visualization(
             self.default_weights["structural"],
             self.default_weights["flows"],
             self.default_weights["organizational"],
-            self.default_weights["subprocess"]
+            self.default_weights["subprocess"],
+            self.default_weights.get("behavioral", 0.0),
         )
 
         # Layout widgets
@@ -438,6 +544,10 @@ class BPMNSimilarityDashboard:
             self.flows_slider,
             self.organizational_slider,
             self.subprocess_slider,
+            self.behavioral_slider,
+            widgets.HTML("<b>Trace extraction:</b>"),
+            self.trace_timeout_slider,
+            self.loop_depth_slider,
             button_box,
             self.message_output,
             self.output,
@@ -454,7 +564,9 @@ def create_similarity_dashboard(
     calculate_similarity_func,
     normalize_func,
     initial_threshold=0.7,
-    initial_method="dice"
+    initial_method="dice",
+    initial_trace_timeout=5.0,
+    initial_max_loop_depth=3,
 ):
     """
     Create an interactive BPMN similarity dashboard.
@@ -463,10 +575,14 @@ def create_similarity_dashboard(
         model_1: Reference BPMN model (minimal JSON dict)
         model_2: BPMN model to compare (minimal JSON dict)
         similarity_func: String similarity function (e.g., bert_cosine_optimized)
-        calculate_similarity_func: BPMN similarity function (calculate_bpmn_similarity)
+        calculate_similarity_func: BPMN similarity function (calculate_bpmn_similarity).
+            Must accept ``behavioral=``, ``trace_timeout_seconds=``, ``max_loop_depth=``
+            keyword arguments — the dashboard always invokes it with ``behavioral=True``.
         normalize_func: Normalization function (normalize_atomic_names)
         initial_threshold: Initial normalization threshold (default: 0.7)
         initial_method: Initial similarity method (default: "dice")
+        initial_trace_timeout: Initial trace-extraction timeout in seconds (default: 5.0)
+        initial_max_loop_depth: Initial max loop depth for trace extraction (default: 3)
 
     Returns:
         BPMNSimilarityDashboard instance. Call .display() to show.
@@ -494,7 +610,9 @@ def create_similarity_dashboard(
         calculate_similarity_func=calculate_similarity_func,
         normalize_func=normalize_func,
         initial_threshold=initial_threshold,
-        initial_method=initial_method
+        initial_method=initial_method,
+        initial_trace_timeout=initial_trace_timeout,
+        initial_max_loop_depth=initial_max_loop_depth,
     )
 
 
