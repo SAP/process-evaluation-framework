@@ -1,10 +1,80 @@
 # similarity functions for comparing two bpmn instances
+#
+# This module is the single home for all similarity computation:
+#   - structural similarity from `calculate_bpmn_similarity` (BPMN element/flow sets)
+#   - behavioral similarity from `calculate_trace_similarity` (execution traces)
+#
+# `calculate_bpmn_similarity` can compute both in one call when ``behavioral=True``
+# is passed; it then internally invokes `extract_traces` from `trace_extraction`.
+
+from typing import List, Union
 
 from bpmn_sets import extract_bpmn_sets
-from utils.list_similarity import dice_list, index_list, jaccard_list, scores
+from trace_extraction import TraceExtractionResult, extract_traces
+from utils.list_similarity import dice_list, index_list, jaccard_list, overlap_list, scores
+
+# Public type alias: most similarity helpers accept either raw traces or a
+# TraceExtractionResult.
+TracesOrResult = Union[List[List[str]], TraceExtractionResult]
 
 
-def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights=None):
+def _coerce_to_trace_list(arg: TracesOrResult) -> List[List[str]]:
+    if isinstance(arg, TraceExtractionResult):
+        return arg.all_traces()
+    return arg
+
+
+def calculate_trace_similarity(
+    traces_1: TracesOrResult,
+    traces_2: TracesOrResult,
+    method: str = "jaccard"
+) -> float:
+    """Calculate similarity between two sets of traces.
+
+    Args:
+        traces_1: First set of traces, or a :class:`TraceExtractionResult`.
+        traces_2: Second set of traces, or a :class:`TraceExtractionResult`.
+        method: Similarity metric – ``"jaccard"`` (default), ``"dice"``,
+            ``"overlap"`` (overlap coefficient), or ``"precision"`` /
+            ``"recall"`` / ``"f1"`` (computed over the deduped trace sets,
+            with ``traces_1`` treated as ground truth).
+
+    Returns:
+        Similarity score between 0.0 and 1.0. When given
+        :class:`TraceExtractionResult` arguments, similarity is computed over
+        the union of sound variants and partial traces from each side.
+    """
+    list_1 = _coerce_to_trace_list(traces_1)
+    list_2 = _coerce_to_trace_list(traces_2)
+
+    set_1 = list({tuple(trace) for trace in list_1})
+    set_2 = list({tuple(trace) for trace in list_2})
+
+    if method == "jaccard":
+        score, _ = jaccard_list(set_1, set_2)
+        return score
+    elif method == "dice":
+        score, _ = dice_list(set_1, set_2)
+        return score
+    elif method == "overlap":
+        score, _ = overlap_list(set_1, set_2)
+        return score
+    elif method in {"precision", "recall", "f1"}:
+        score, _ = scores(set_1, set_2, score_type=method)
+        return score
+    else:
+        raise ValueError(f"Unknown similarity method: {method}")
+
+
+def calculate_bpmn_similarity(
+    bpmn_object1,
+    bpmn_object2,
+    method="dice",
+    weights=None,
+    behavioral=False,
+    trace_timeout_seconds=5.0,
+    max_loop_depth=3,
+):
     """
     Calculates BPMN similarity at three levels: fine, grouped, and high-level, with weighted overall score.
 
@@ -14,6 +84,18 @@ def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights
       (structural=36.84%, flows=47.37%, organizational=15.79%, subprocess=0%)
 
     Collapsed subprocesses are treated as regular activities and don't trigger subprocess weighting.
+
+    When ``behavioral=True``, the function additionally extracts execution traces from
+    both models (via :func:`trace_extraction.extract_traces`), computes their similarity,
+    and adds the following keys to the result dict:
+
+    - ``behavioral``: high-level behavioral score, weighted into ``overall``
+    - ``behavioral_metric_used``: actual metric used (``"dice"`` or ``"jaccard"``)
+    - ``trace_result_1``, ``trace_result_2``: the :class:`TraceExtractionResult` objects
+    - ``high_level_scores["behavioral"]`` and ``weights_used["behavioral"]`` (defaults to 0.0)
+
+    With ``behavioral=False`` (default), no trace extraction is performed and the
+    result dict is identical to the structural-only output.
 
     Returns a dict with all levels including 'weights_used' and 'has_expanded_subprocess' keys.
     """
@@ -85,6 +167,12 @@ def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights
             "subprocess": 0.0
         }
 
+    # When behavioral is requested, add the bucket *before* weight validation and
+    # the overall computation so they pick it up uniformly. Default weight is 0.0
+    # so existing callers see an unchanged ``overall`` value.
+    if behavioral:
+        default_weights["behavioral"] = 0.0
+
     if weights is not None:
         # Validate weights
         expected_keys = set(default_weights.keys())
@@ -108,6 +196,30 @@ def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights
         "organizational": grouped_scores["pools"],
         "subprocess": grouped_scores["subprocess"]
     }
+
+    # Behavioral block: extract traces and compute similarity. Only runs when
+    # opted in. Records the actual metric used so callers can label the result.
+    behavioral_metric_used = None
+    trace_result_1 = None
+    trace_result_2 = None
+    if behavioral:
+        trace_result_1 = extract_traces(
+            bpmn_object1,
+            max_loop_depth=max_loop_depth,
+            timeout_seconds=trace_timeout_seconds,
+        )
+        trace_result_2 = extract_traces(
+            bpmn_object2,
+            max_loop_depth=max_loop_depth,
+            timeout_seconds=trace_timeout_seconds,
+        )
+        # Mirror the structural metric — calculate_trace_similarity supports
+        # the same methods as the structural toggle (dice, jaccard, precision,
+        # recall, f1) plus overlap, so no fallback is needed.
+        behavioral_metric_used = method
+        high_level_scores["behavioral"] = calculate_trace_similarity(
+            trace_result_1, trace_result_2, method=behavioral_metric_used
+        )
 
     # Weighted overall score
     total_weight = sum(default_weights.values())
@@ -135,6 +247,10 @@ def calculate_bpmn_similarity(bpmn_object1, bpmn_object2, method="dice", weights
     result["organizational_grouped"] = high_level_scores["organizational"]
     result["subprocess_grouped"] = high_level_scores["subprocess"]
 
+    if behavioral:
+        result["behavioral"] = high_level_scores["behavioral"]
+        result["behavioral_metric_used"] = behavioral_metric_used
+        result["trace_result_1"] = trace_result_1
+        result["trace_result_2"] = trace_result_2
+
     return result
-
-
