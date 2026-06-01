@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 # simplified BPMN JSON schema.
 # it captures the most used BPMN elements as lists.
 # each element has an id, which allows cross-referencing of elements across the lists.
@@ -138,36 +136,3 @@ bpmn_schema = {
         },
     },
 }
-
-
-SUBPROCESS_TYPES = {"Subprocess", "EventSubprocess"}
-
-
-def _iter_flow_nodes(d: Dict[str, Any]):
-    for kind in ("activities", "events", "gateways"):
-        for elem in d.get(kind, []) or []:
-            yield elem, kind
-
-
-def derive_parent_subprocess(d: Dict[str, Any]) -> None:
-    """Make `parent_subprocess` consistent with `elemRefs`, in place.
-
-    `elemRefs` on subprocess activities is the source of truth. For every id
-    listed in any `S.elemRefs`, set `parent_subprocess = S.id` on the
-    referenced element. Any `parent_subprocess` on an element that is not
-    referenced by some subprocess's `elemRefs` is removed.
-
-    Call this once after a converter has produced a simplified BPMN dict.
-    """
-    id_to_subprocess: Dict[str, str] = {}
-    for sp in d.get("activities", []) or []:
-        if sp.get("type") in SUBPROCESS_TYPES:
-            for child_id in sp.get("elemRefs", []) or []:
-                id_to_subprocess[child_id] = sp["id"]
-
-    for elem, _kind in _iter_flow_nodes(d):
-        sp_id = id_to_subprocess.get(elem["id"])
-        if sp_id is not None:
-            elem["parent_subprocess"] = sp_id
-        elif "parent_subprocess" in elem:
-            del elem["parent_subprocess"]
