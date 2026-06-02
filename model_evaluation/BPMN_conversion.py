@@ -78,10 +78,9 @@ class BPMNConverter:
         "Business Rule": "Business Rule",
         "Script": "Script",
         "Subprocess": "Subprocess",
-        "CollapsedSubprocess": "Subprocess",              # fold visual variant
+        "CollapsedSubprocess": "CollapsedSubprocess",              # was "Subprocess" — reverted
         "EventSubprocess": "EventSubprocess",
-        "CollapsedEventSubprocess": "EventSubprocess",    # fold visual variant
-        # Add more if needed
+        "CollapsedEventSubprocess": "CollapsedEventSubprocess",    # was "EventSubprocess" — reverted
     }
 
     @classmethod
@@ -162,7 +161,7 @@ class BPMNConverter:
                 elem["type"] = minimal_type
                 # If this is a subprocess, recurse!
                 if minimal_type in [
-                    "Subprocess", "CollapsedSubprocess", "EventSubprocess", "CollapsedEventSubprocess"]:
+                    "Subprocess", "EventSubprocess"]:
                     # Split childShapes into flows and children
                     children = []
                     sub_flows = []

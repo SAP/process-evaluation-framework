@@ -27,7 +27,7 @@ model_evaluation/
 ├── rendering/                  # Visualization modules
 │   ├── bpmn_viewer.py          # BPMN XML viewer using bpmn-js
 │   └── dashboard.py            # Interactive similarity dashboard
-├── BPMN_conversion.py          # Signavio JSON → minimal BPMN converter
+├── BPMN_conversion.py          # Signavio JSON and XML 2.0 → minimal BPMN converter
 ├── bpmn_normalization.py       # Semantic name alignment
 ├── bpmn_sets.py                # Element set extraction
 ├── bpmn_similarity.py          # Similarity calculation engine
@@ -36,7 +36,7 @@ model_evaluation/
 ├── petri.py                    # Petri net
 ├── trace_extraction.py         # Trace/variant extraction via Petri nets
 ├── sapsam_mapping.py           # SAP-specific mappings
-└── XML_conversion.py           # BPMN XML 2.0 → minimal BPMN converter
+
 
 notebooks/
 └── model_eval_code_usage.ipynb # Usage examples and demonstrations
