@@ -7,10 +7,10 @@
 # `calculate_bpmn_similarity` can compute both in one call when ``behavioral=True``
 # is passed; it then internally invokes `extract_traces` from `trace_extraction`.
 
-from typing import List, Union
+from typing import List, Union, Literal
 
 from bpmn_sets import extract_bpmn_sets
-from trace_extraction import TraceExtractionResult, extract_traces
+from trace_extraction import TraceExtractionResult, extract_ngrams, extract_traces
 from utils.list_similarity import dice_list, index_list, jaccard_list, overlap_list, scores
 
 # Public type alias: most similarity helpers accept either raw traces or a
@@ -49,6 +49,47 @@ def calculate_trace_similarity(
 
     set_1 = list({tuple(trace) for trace in list_1})
     set_2 = list({tuple(trace) for trace in list_2})
+
+    if method == "jaccard":
+        score, _ = jaccard_list(set_1, set_2)
+        return score
+    elif method == "dice":
+        score, _ = dice_list(set_1, set_2)
+        return score
+    elif method == "overlap":
+        score, _ = overlap_list(set_1, set_2)
+        return score
+    elif method in {"precision", "recall", "f1"}:
+        score, _ = scores(set_1, set_2, score_type=method)
+        return score
+    else:
+        raise ValueError(f"Unknown similarity method: {method}")
+
+
+def calculate_ngram_similarity(
+    traces_1: TracesOrResult,
+    traces_2: TracesOrResult,
+    n: int = 2,
+    method: Literal["jaccard", "dice", "overlap", "precision", "recall", "f1"] = "jaccard",
+    pad: bool = True,
+) -> float:
+    """Set-based n-gram similarity between two trace collections.
+
+    Decomposes each side into length-n contiguous subsequences, dedupes to a set,
+    and scores with the same metrics :func:`calculate_trace_similarity` supports.
+
+    Args:
+        traces_1: First trace set or a class TraceExtractionResult
+        traces_2: Second trace set, same accepted shapes
+        n: N-gram window length. Must be >= 1
+        method
+        pad: Whether to wrap each trace with <START> / <END>
+
+    Returns:
+        Similarity score between 0.0 and 1.0.
+    """
+    set_1 = list(set(extract_ngrams(traces_1, n=n, pad=pad)))
+    set_2 = list(set(extract_ngrams(traces_2, n=n, pad=pad)))
 
     if method == "jaccard":
         score, _ = jaccard_list(set_1, set_2)
