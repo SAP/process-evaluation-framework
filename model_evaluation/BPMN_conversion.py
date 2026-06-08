@@ -183,7 +183,7 @@ class BPMNConverter:
                         sequence_flows=sub_seq,
                         message_flows=[],
                         parent_lane=parent_lane,
-                        parent_subprocess=elem["name"] or elem["id"]
+                        parent_subprocess=elem["id"]
                     )
                     for a in sub_acts:
                         if a["id"] not in {e["id"] for e in model.activities}:
