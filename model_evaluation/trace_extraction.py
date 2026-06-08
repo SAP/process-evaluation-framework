@@ -13,7 +13,7 @@ emitted via the ``model_evaluation.trace_extraction`` logger per non-sound net.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, Union
 
 from petri import (
     ExplorationDiagnostics,
@@ -199,6 +199,37 @@ def get_trace_statistics(traces: List[List[str]]) -> Dict[str, Any]:
     }
 
 
+def extract_ngrams(
+    traces: Union[List[List[str]], "TraceExtractionResult"],
+    n: int = 2,
+    pad: bool = True,
+) -> List[Tuple[str, ...]]:
+    """Decompose traces into a flat list of length n contiguous subsequences.
+    With pad=True (default), each trace is wrapped with <START> and <END>, so first/last
+    activity differences become distinct n-grams.
+
+    Args:
+        traces: Trace list, or a class TraceExtractionResult (in which case its all_traces())
+        n: Window length (Must be >= 1)
+        pad: Whether to wrap each trace with <START> / <END>
+
+    Returns:
+        Flat list of n-grams (tuples of strings), in trace order
+    """
+    if n < 1:
+        raise ValueError(f"n must be >= 1, got {n}")
+
+    trace_list = _coerce_to_trace_list(traces)
+    ngrams: List[Tuple[str, ...]] = []
+    for trace in trace_list:
+        seq = ["<START>", *trace, "<END>"] if pad else list(trace)
+        if len(seq) < n:
+            continue
+        for i in range(len(seq) - n + 1):
+            ngrams.append(tuple(seq[i : i + n]))
+    return ngrams
+
+
 def compare_trace_sets(
     traces_1,
     traces_2,
@@ -222,7 +253,7 @@ def compare_trace_sets(
     # Lazy import: ``calculate_trace_similarity`` lives in ``bpmn_similarity``,
     # which itself imports from this module. Importing it here keeps the
     # top-level dependency one-way (bpmn_similarity → trace_extraction).
-    from bpmn_similarity import calculate_trace_similarity
+    from bpmn_similarity import calculate_ngram_similarity, calculate_trace_similarity
 
     list_1 = _coerce_to_trace_list(traces_1)
     list_2 = _coerce_to_trace_list(traces_2)
@@ -248,6 +279,9 @@ def compare_trace_sets(
         "jaccard_similarity": calculate_trace_similarity(traces_1, traces_2, "jaccard"),
         "dice_similarity": calculate_trace_similarity(traces_1, traces_2, "dice"),
         "overlap_similarity": calculate_trace_similarity(traces_1, traces_2, "overlap"),
+        "bigram_jaccard": calculate_ngram_similarity(traces_1, traces_2, n=2, method="jaccard"),
+        "bigram_dice": calculate_ngram_similarity(traces_1, traces_2, n=2, method="dice"),
+        "bigram_overlap": calculate_ngram_similarity(traces_1, traces_2, n=2, method="overlap"),
     }
     if isinstance(traces_1, TraceExtractionResult):
         result["model_1_diagnostics"] = traces_1.diagnostics
@@ -287,6 +321,12 @@ def print_trace_comparison(comparison: Dict[str, Any], show_traces: bool = False
     print(f"  • Jaccard: {comparison['jaccard_similarity']:.2%}")
     print(f"  • Dice: {comparison['dice_similarity']:.2%}")
     print(f"  • Overlap: {comparison['overlap_similarity']:.2%}")
+
+    if "bigram_jaccard" in comparison:
+        print("\nBigram Similarity (graded — shared directly-follows pairs):")
+        print(f"  • Jaccard: {comparison['bigram_jaccard']:.2%}")
+        print(f"  • Dice: {comparison['bigram_dice']:.2%}")
+        print(f"  • Overlap: {comparison['bigram_overlap']:.2%}")
 
     print("\nTrace Coverage:")
     print(f"  • Common variants: {len(comparison['common_traces'])}")
