@@ -1,4 +1,11 @@
-# bpmn_sets.py
+_SUBPROCESS_TYPE_EQUIVALENCE = {
+    "CollapsedSubprocess": "Subprocess",
+    "CollapsedEventSubprocess": "EventSubprocess",
+}
+
+def _canonical_activity_type_for_comparison(t: str) -> str:
+    return _SUBPROCESS_TYPE_EQUIVALENCE.get(t, t)
+
 
 def get_element_by_id_from_sublist(bpmn_sublist, id_):
     """Find element by id in one of the sublists."""
@@ -60,22 +67,33 @@ def get_flows_with_values(bpmn_instance):
 def get_lane_groups_with_refs(bpmn_instance):
     """
     Returns:
-      - lane_names: list of "pool|lane" strings (one for each lane; if no lanes, just the pool).
-      - lane_with_refs: list of "pool|lane|elemRefName" (if no lane, "pool||elemRefName")
+      - lane_names: list of "pool|lane" strings. Unnamed pools/lanes contribute
+        empty name components (e.g. "|Driver" or "Car|"); a group is omitted
+        only when BOTH the pool and lane names are empty (no identity signal).
+      - lane_with_refs: list of "pool|lane|elemRefName". Element rows are kept
+        even when the pool/lane is unnamed (e.g. "||Start"), so the set of
+        contained elements is still compared across models.
+
+    No placeholder strings ("Pool"/"Lane") are injected for missing names, since
+    that would make unnamed containers falsely match across unrelated models.
     """
     lane_names = []
     lane_with_refs = []
     for pool in bpmn_instance.get("pools", []):
-        pool_name = pool.get("name") or "Pool"
+        pool_name = pool.get("name", "")
         lanes = pool.get("lanes", [])
         if not lanes:
-            lane_names.append(pool_name)
+            # Pool with no lanes: only contributes if it actually has a name.
+            if pool_name:
+                lane_names.append(pool_name)
+            continue
         for lane in lanes:
-            lane_name = lane.get("name") or "Lane"
-            lane_group = "|".join([pool_name, lane_name])
-            lane_names.append(lane_group)
+            lane_name = lane.get("name", "")
+            # Add the lane group only if there is some name signal.
+            if pool_name or lane_name:
+                lane_names.append("|".join([pool_name, lane_name]))
             for ref_id in lane.get("elemRefs", []):
-                # Lookup: activities, events, gateways; then fallback to id only if nothing found
+                # Lookup: activities, events, gateways; no id fallback in the set
                 ref_val = ""
                 for sublist in ["activities", "events"]:
                     elem = get_element_by_id_from_sublist(bpmn_instance.get(sublist, []), ref_id)
@@ -86,18 +104,31 @@ def get_lane_groups_with_refs(bpmn_instance):
                     elem = get_element_by_id_from_sublist(bpmn_instance.get("gateways", []), ref_id)
                     if elem:
                         ref_val = elem.get("type", "")
-                if not ref_val:
-                    ref_val = ""  # Do not use the id in the visible set
-                lane_with_refs.append("|".join([pool_name, lane_name, ref_val]))
+                # Keep element rows even when pool/lane are unnamed, but only when
+                # the referenced element itself resolves to a real name/type.
+                if ref_val:
+                    lane_with_refs.append("|".join([pool_name, lane_name, ref_val]))
     return lane_names, lane_with_refs
 
 
 def get_subprocess_groups_with_refs(bpmn_instance):
     """
     Returns:
-      - subprocess_names: list of subprocess names (uses type as fallback if name is empty).
-      - subprocess_elemrefs: list of element names/types within subprocesses (structure-independent).
-      - subprocess_flows: list of "sourceElem|targetElem" for internal flows (structure-independent).
+      - subprocess_names: list of subprocess names (real names only; unnamed
+        subprocesses are not added here — no type placeholder).
+      - subprocess_elemrefs: list of "scopeKey|elementName" within subprocesses.
+        Each element is prefixed with its subprocess scope so elements are only
+        compared within their corresponding subprocess (mirrors how lanes are
+        scoped by pool|lane), not pooled across unrelated subprocesses.
+      - subprocess_flows: list of "scopeKey|sourceElem|targetElem" for internal
+        flows, prefixed the same way.
+
+    Scope key (per subprocess):
+      - the subprocess name when it has one (already normalized upstream, since
+        the subprocess parent is a top-level activity)
+      - "__sp{N}" otherwise, where N counts unnamed subprocesses in document
+        order. This pairs the i-th unnamed subprocess of one model with the
+        i-th unnamed subprocess of the other ("name and order" matching).
     """
     # Helper for looking up names/types for referenced IDs
     def get_ref_value(ref_id):
@@ -115,6 +146,7 @@ def get_subprocess_groups_with_refs(bpmn_instance):
     subprocess_names = []
     subprocess_elemrefs = []
     subprocess_flows = []
+    unnamed_counter = 0
     for activity in bpmn_instance.get("activities", []):
         act_type = activity.get("type", "")
         # Use exact type matching for expanded subprocesses
@@ -122,8 +154,16 @@ def get_subprocess_groups_with_refs(bpmn_instance):
             act_type in ["Subprocess", "EventSubprocess"]
             and "elemRefs" in activity
         ):
-            subprocess_name = activity.get("name") or activity.get("type", "Subprocess")
-            subprocess_names.append(subprocess_name)
+            subprocess_name = activity.get("name", "").strip()
+            if subprocess_name:
+                # Named subprocess: scope by name, also contribute to the names set.
+                scope_key = subprocess_name
+                subprocess_names.append(subprocess_name)
+            else:
+                # Unnamed subprocess: scope by positional identity (document order).
+                scope_key = f"__sp{unnamed_counter}"
+                unnamed_counter += 1
+
             for ref_id in activity.get("elemRefs", []):
                 ref_val = ""
                 # Should check both activities AND events for referenced elements!
@@ -136,22 +176,20 @@ def get_subprocess_groups_with_refs(bpmn_instance):
                     elem = get_element_by_id_from_sublist(bpmn_instance.get("gateways", []), ref_id)
                     if elem:
                         ref_val = elem.get("type", "")
-                if not ref_val:
-                    ref_val = ""
                 if ref_val:
-                    # Remove subprocess name prefix to test structure independently
-                    subprocess_elemrefs.append(ref_val)
+                    # Prefix with scope key so elements are compared within their
+                    # subprocess, not pooled across all subprocesses.
+                    subprocess_elemrefs.append(f"{scope_key}|{ref_val}")
 
             # Extract subprocess internal flows
             for flow in activity.get("subprocessSequenceFlows", []):
                 source_val = get_ref_value(flow.get("sourceRef"))
                 target_val = get_ref_value(flow.get("targetRef"))
                 if source_val and target_val:
-                    # Remove subprocess name prefix to test flow structure independently
-                    subprocess_flows.append(f"{source_val}|{target_val}")
+                    # Prefix with scope key so flows are compared within their subprocess.
+                    subprocess_flows.append(f"{scope_key}|{source_val}|{target_val}")
 
     return subprocess_names, subprocess_elemrefs, subprocess_flows
-
 
 def get_list(bpmn_object, sublist, attribute):
     """Returns a list of attributes within a sublist of a bpmn_object."""
@@ -163,7 +201,8 @@ def extract_bpmn_sets(bpmn_object):
     # Only MAIN process elements (top-level, not in subprocess)
     sets = {}
     sets["activity_names"] = [a.get("name", "") for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
-    sets["activity_types"] = [a.get("type", "") for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
+    sets["activity_types"] = [_canonical_activity_type_for_comparison(a.get("type", "")) for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
+    # sets["activity_types"] = [a.get("type", "") for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
     sets["event_names"]    = [e.get("name", "") for e in bpmn_object.get("events", []) if not e.get("parent_subprocess", "")]
     sets["event_types"]    = [e.get("type", "") for e in bpmn_object.get("events", []) if not e.get("parent_subprocess", "")]
     sets["gateway_names"]  = [g.get("name", "") for g in bpmn_object.get("gateways", []) if not g.get("parent_subprocess", "")]
@@ -184,5 +223,3 @@ def extract_bpmn_sets(bpmn_object):
     sets["subprocess_flows"] = subprocess_flows
 
     return sets
-
-
