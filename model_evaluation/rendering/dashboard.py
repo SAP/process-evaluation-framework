@@ -413,11 +413,7 @@ class BPMNSimilarityDashboard:
         for name, button in self.metric_buttons.items():
             button.button_style = "primary" if name == metric_name else ""
 
-        self._recalculate(None)
-
-        # Metric also drives behavioral scoring. If traces are already
-        # extracted, re-score them under the new metric (cheap) and refresh
-        # the behavioral and hybrid sections.
+        # Metric also drives behavioral scoring. Re-score behavioral first
         if self._behavioral_enabled and self._last_trace_result_1 is not None:
             self._last_behavioral_score = self.calculate_trace_similarity(
                 self._last_trace_result_1,
@@ -426,7 +422,8 @@ class BPMNSimilarityDashboard:
             )
             self._last_behavioral_metric = self.current_metric
             self._render_behavioral()
-            self._render_hybrid()
+
+        self._recalculate(None)
 
     def _on_threshold_change(self, change):
         """Handle threshold slider changes."""
