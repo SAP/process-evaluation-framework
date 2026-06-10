@@ -37,23 +37,6 @@ def _adaptive_grouped(fine_scores, data_presence, components):
     ``data_presence`` is ``False``, that component is dropped and the
     remaining weights are rescaled to sum to 1.0 among themselves. If every
     component is empty-vs-empty, returns ``None`` — there is nothing to
-    compare, so any number would be misleading.
-    """
-    present = [(key, w) for key, w in components if data_presence.get(key, False)]
-    if not present:
-        return None
-    total_weight = sum(w for _, w in present)
-    return sum(fine_scores[key] * w / total_weight for key, w in present)
-
-
-def _adaptive_grouped(fine_scores, data_presence, components):
-    """Weighted average over components, dropping empty-vs-empty ones.
-
-    Each ``component`` is a ``(fine_key, weight)`` pair. The weight is the
-    nominal contribution when *all* components have data. When a component's
-    ``data_presence`` is ``False``, that component is dropped and the
-    remaining weights are rescaled to sum to 1.0 among themselves. If every
-    component is empty-vs-empty, returns ``None`` — there is nothing to
     compare so any number would be misleading.
 
     Used to compute the grouped scores (activities, events, gateways, flows,
