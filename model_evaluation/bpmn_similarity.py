@@ -200,6 +200,8 @@ def calculate_bpmn_similarity(
             fine_scores[key] = dice_list(l1, l2)[0]
         elif method == "jaccard":
             fine_scores[key] = jaccard_list(l1, l2)[0]
+        elif method == "overlap":
+            fine_scores[key] = overlap_list(l1, l2)[0]
         elif method in {"precision", "recall", "f1"}:
             fine_scores[key] = scores(l1, l2, score_type=method)[0]
         else:
