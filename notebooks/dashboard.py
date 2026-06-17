@@ -108,6 +108,20 @@ def _theme(mo):
         border-radius: 8px; padding: 10px 12px; font-family: ui-monospace,
         SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1e293b;
         white-space: pre-wrap; line-height: 1.55; }
+    .pe-chips { display: flex; flex-direction: column; gap: 8px;
+        margin: 4px 0 8px 0; }
+    .pe-chip-row { display: flex; flex-wrap: wrap; align-items: center;
+        gap: 8px; font-size: 12.5px; color: #334155; }
+    .pe-chip-label { font-weight: 600; min-width: 64px; color: #0f172a; }
+    .pe-badge { color: white; font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 999px; letter-spacing: .02em;
+        text-transform: capitalize; }
+    .pe-chip { background: #f1f5f9; border-radius: 999px; padding: 2px 10px;
+        font-variant-numeric: tabular-nums; }
+    .pe-chip-sound   { color: #15803d; background: #dcfce7; }
+    .pe-chip-partial { color: #b45309; background: #fef3c7; }
+    .pe-chip-loop    { color: #6d28d9; background: #ede9fe; }
+    .pe-chip-notes   { font-size: 12px; color: #64748b; padding-left: 76px; }
     </style>
     """
 
@@ -187,7 +201,7 @@ def _model_pickers(bpmn_options, default_1, default_2, mo):
 
 @app.cell
 def _models_card(card, mo, model1_dd, model2_dd):
-    card("Models", mo.hstack([model1_dd, model2_dd], justify="start", gap=2))
+    card("Models", mo.vstack([model1_dd, model2_dd], gap=1))
     return
 
 
@@ -281,12 +295,11 @@ def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
     except Exception:
         _opts = None
 
-    diagrams = mo.hstack(
+    diagrams = mo.vstack(
         [
             card("Model 1", mo.Html(bpmn_iframe(xml1))),
             card("Model 2", mo.Html(bpmn_iframe(xml2))),
         ],
-        widths="equal",
         gap=1,
     )
     diagrams
@@ -527,8 +540,8 @@ def _fig_weighted_contributions(
 
     _fig.update_layout(
         barmode="group",
-        height=320,
-        margin=dict(l=120, r=20, t=60, b=40),
+        height=480,
+        margin=dict(l=120, r=20, t=110, b=40),
         plot_bgcolor="white",
         paper_bgcolor="white",
         title=dict(
@@ -537,6 +550,11 @@ def _fig_weighted_contributions(
                 f"@ threshold {threshold_slider.value:.2f}"
             ),
             font=dict(size=13, color="#0f172a"),
+            x=0,
+            xanchor="left",
+            y=0.97,
+            yanchor="top",
+            yref="container",
         ),
         legend=dict(
             orientation="h",
@@ -642,14 +660,19 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
     )
 
     _fig2.update_layout(
-        height=420,
+        height=480,
         barmode="overlay",
-        margin=dict(l=140, r=30, t=60, b=40),
+        margin=dict(l=140, r=30, t=110, b=40),
         plot_bgcolor="white",
         paper_bgcolor="white",
         title=dict(
             text="Element-Level Breakdown (unweighted)",
             font=dict(size=13, color="#0f172a"),
+            x=0,
+            xanchor="left",
+            y=0.97,
+            yanchor="top",
+            yref="container",
         ),
         legend=dict(
             orientation="h",
@@ -686,84 +709,49 @@ def _structural_card(
     overall,
     subprocess_w,
 ):
-    weights_row = mo.hstack(
-        [elements_w, flows_w, org_w, subprocess_w], justify="start", gap=2
+    # Two rows of two sliders each — at four-up the slider track and the
+    # right-hand value label fight for a column that's too narrow once the
+    # card padding is taken out, so the value clips. 2×2 lets each slider
+    # have ~50% of the card width and reflow as the page resizes.
+    weights_row = mo.vstack(
+        [
+            mo.hstack([elements_w, flows_w], widths="equal", gap=2),
+            mo.hstack([org_w, subprocess_w], widths="equal", gap=2),
+        ],
+        gap=1,
     )
     _s_headline = mo.Html(kpi_html("Structural overall", fmt_pct(overall), "#2c3e50"))
-    charts = mo.hstack([fig_weighted, fig_breakdown], widths="equal", gap=1)
-    card("Structural similarity", weights_row, _s_headline, charts)
-    return
-
-
-@app.cell
-def _trace_controls(mo):
-    trace_timeout = mo.ui.slider(
-        start=1, stop=30, step=1, value=5, label="Trace timeout (s)", show_value=True
-    )
-    loop_depth = mo.ui.slider(
-        start=1, stop=6, step=1, value=3, label="Max loop depth", show_value=True
-    )
-    compute_button = mo.ui.run_button(
-        label="Compute behavioral", kind="success"
-    )
-    return compute_button, loop_depth, trace_timeout
-
-
-@app.cell
-def _trace_controls_card(card, compute_button, loop_depth, mo, trace_timeout):
-    card(
-        "Trace extraction parameters",
-        mo.md(
-            "Trace extraction is the expensive step — click **Compute "
-            "behavioral** to run it. Changing the metric or n-gram length "
-            "below will _not_ re-extract."
-        ),
-        mo.hstack(
-            [trace_timeout, loop_depth, compute_button],
-            justify="start",
-            gap=2,
-        ),
-    )
+    charts = mo.hstack([fig_weighted, fig_breakdown], widths="equal", gap=2)
+    card("Structural similarity", weights_row, charts, _s_headline)
     return
 
 
 @app.cell
 def _extract_traces(
-    compute_button,
     extract_traces,
-    loop_depth,
     m2_aligned,
-    mo,
     model_1_json,
-    threshold_slider,
-    trace_timeout,
 ):
-    # Gated trace extraction. ``mo.stop`` short-circuits this cell — and
-    # everything downstream that depends on its outputs — until the run button
-    # has been clicked. Critically, this cell does NOT depend on
-    # ``metric_radio`` or ``ngram_n``, so changes to either won't re-extract.
-    #
-    mo.stop(
-        not compute_button.value,
-        mo.md("_Click **Compute behavioral** to extract traces and score them._"),
-    )
+    # Reactive trace extraction. Re-runs whenever ``m2_aligned`` or
+    # ``model_1_json`` changes (model selection, normalization threshold,
+    # metric). Trace timeout and max-loop-depth are pinned to sensible
+    # defaults — the original ipywidgets dashboard exposed them as sliders
+    # but they're rarely touched in practice, and the run-button gate
+    # added more friction than it saved.
+    TRACE_TIMEOUT = 5
+    LOOP_DEPTH = 3
 
     tr1 = extract_traces(
         model_1_json,
-        timeout_seconds=trace_timeout.value,
-        max_loop_depth=loop_depth.value,
+        timeout_seconds=TRACE_TIMEOUT,
+        max_loop_depth=LOOP_DEPTH,
     )
     tr2 = extract_traces(
         m2_aligned,
-        timeout_seconds=trace_timeout.value,
-        max_loop_depth=loop_depth.value,
+        timeout_seconds=TRACE_TIMEOUT,
+        max_loop_depth=LOOP_DEPTH,
     )
-    extraction_key = (
-        threshold_slider.value,
-        trace_timeout.value,
-        loop_depth.value,
-    )
-    return extraction_key, tr1, tr2
+    return tr1, tr2
 
 
 @app.cell
@@ -811,140 +799,221 @@ def _behavioral_scores(
 @app.cell
 def _ngram_counts(extract_ngrams, ngram_n, tr1, tr2):
     # Mirrors ``_compute_ngram_counts`` in the original dashboard.
-    n = ngram_n.value
-    ngrams_1 = set(extract_ngrams(tr1, n=n, pad=True))
-    ngrams_2 = set(extract_ngrams(tr2, n=n, pad=True))
-    shared = len(ngrams_1 & ngrams_2)
-    only_1 = len(ngrams_1 - ngrams_2)
-    only_2 = len(ngrams_2 - ngrams_1)
-    union = shared + only_1 + only_2
-    overlap_pct = (shared / union) if union else 0.0
+    # All locals are underscore-prefixed so marimo treats them as
+    # cell-private — ``_behavioral_set_counts`` re-uses the names
+    # ``only_1`` / ``shared`` / ``only_2`` / ``union`` at top level and
+    # marimo would otherwise complain about a multi-cell definition.
+    _n = ngram_n.value
+    _ngrams_1 = set(extract_ngrams(tr1, n=_n, pad=True))
+    _ngrams_2 = set(extract_ngrams(tr2, n=_n, pad=True))
+    _shared = len(_ngrams_1 & _ngrams_2)
+    _only_1 = len(_ngrams_1 - _ngrams_2)
+    _only_2 = len(_ngrams_2 - _ngrams_1)
+    _union = _shared + _only_1 + _only_2
+    _overlap_pct = (_shared / _union) if _union else 0.0
     ngram_counts = {
-        "n": n,
-        "total_1": len(ngrams_1),
-        "total_2": len(ngrams_2),
-        "shared": shared,
-        "only_1": only_1,
-        "only_2": only_2,
-        "union": union,
-        "overlap_pct": overlap_pct,
+        "n": _n,
+        "total_1": len(_ngrams_1),
+        "total_2": len(_ngrams_2),
+        "shared": _shared,
+        "only_1": _only_1,
+        "only_2": _only_2,
+        "union": _union,
+        "overlap_pct": _overlap_pct,
     }
     return (ngram_counts,)
 
 
 @app.cell
-def _behavioral_diagnostics(
-    behavioral_kind,
-    extraction_key,
-    loop_depth,
-    metric_radio,
-    ngram_counts,
-    ngram_n,
-    threshold_slider,
-    tr1,
-    tr2,
-    trace_timeout,
-):
-    # Compose the diagnostics block + n-gram summary HTML. Pure render,
-    # no recomputation.
-    current_key = (threshold_slider.value, trace_timeout.value, loop_depth.value)
-    is_stale = extraction_key != current_key
+def _behavioral_set_counts(behavioral_kind, ngram_counts, tr1, tr2):
+    # Single source of truth for the only_1 / shared / only_2 / union
+    # numbers consumed by both the chip block (diagnostics) and the
+    # set-overlap chart. In n-gram mode we already have these on the
+    # ``ngram_counts`` dict; in full-trace mode we compute them from the
+    # raw trace sets — same arithmetic the diagnostics block used to do
+    # inline for its "Traces matched exactly" line.
+    if behavioral_kind.value == "N-gram":
+        set_counts = {
+            "only_1": ngram_counts["only_1"],
+            "shared": ngram_counts["shared"],
+            "only_2": ngram_counts["only_2"],
+            "union": ngram_counts["union"],
+            "unit": "n-grams",
+        }
+    else:
+        _set_1 = {tuple(t) for t in tr1.all_traces()}
+        _set_2 = {tuple(t) for t in tr2.all_traces()}
+        _shared = len(_set_1 & _set_2)
+        _only_1 = len(_set_1 - _set_2)
+        _only_2 = len(_set_2 - _set_1)
+        set_counts = {
+            "only_1": _only_1,
+            "shared": _shared,
+            "only_2": _only_2,
+            "union": _shared + _only_1 + _only_2,
+            "unit": "trace variants",
+        }
+    return (set_counts,)
 
-    lines = []
-    if is_stale:
-        lines.append("⚠ STALE — re-click 'Compute behavioral' to refresh.")
-        lines.append(
-            f"   Last computed at threshold={extraction_key[0]:.2f}, "
-            f"timeout={extraction_key[1]:.0f}s, max_loop={extraction_key[2]}"
-        )
-        lines.append(
-            f"   Current settings: threshold={current_key[0]:.2f}, "
-            f"timeout={current_key[1]:.0f}s, max_loop={current_key[2]}"
-        )
-        lines.append("")
 
-    if not (tr1.is_sound and tr2.is_sound):
-        lines.append("⚠ Behavioral comparison includes partial results")
-        lines.append(
-            f"   Model 1: {tr1.diagnostics.status.value} — {tr1.diagnostics.summary}"
-        )
-        lines.append(
-            f"   Model 2: {tr2.diagnostics.status.value} — {tr2.diagnostics.summary}"
-        )
-        lines.append("")
+@app.cell
+def _fig_behavioral_overlap(go, mo, set_counts):
+    # Single horizontal stacked bar — Only-Model-1 / Shared / Only-Model-2.
+    # Visualizes what DICE / Jaccard are computing on the same set: how
+    # the union splits between the two models. Mirrors the layout of the
+    # structural charts (title pinned to container top, h-orient legend
+    # just below) so the two sections look like one family.
+    # Locals are underscore-prefixed so marimo doesn't promote them to
+    # global names that conflict with ``_ngram_counts``.
+    _only_1 = set_counts["only_1"]
+    _shared = set_counts["shared"]
+    _only_2 = set_counts["only_2"]
+    _union = set_counts["union"]
+    _unit = set_counts["unit"]
 
-    traces_1 = tr1.all_traces()
-    traces_2 = tr2.all_traces()
-    lines.append(f"Model 1: {len(traces_1)} trace variant(s)")
-    lines.append(f"Model 2: {len(traces_2)} trace variant(s)")
-
-    set_1 = {tuple(t) for t in traces_1}
-    set_2 = {tuple(t) for t in traces_2}
-    if set_1 or set_2:
-        lines.append(
-            f"Traces matched exactly: {len(set_1 & set_2)} / {len(set_1 | set_2)}"
+    if _union == 0:
+        # Degenerate case: no traces / n-grams on either side. Bar would
+        # divide by zero; render a quiet placeholder instead. Wrap in
+        # mo.Html so it sits at the same vstack position the chart would.
+        fig_behavioral = mo.Html(
+            "<div class='pe-muted' style='padding:14px 0;'>"
+            f"No {_unit} extracted — set-overlap chart unavailable."
+            "</div>"
         )
+    else:
+        _fig = go.Figure()
+        _segments = [
+            ("Only Model 1", _only_1, "#3498db"),
+            ("Shared",        _shared, "#2c3e50"),
+            ("Only Model 2", _only_2, "#9b59b6"),
+        ]
+        for _name, _count, _color in _segments:
+            _pct = _count / _union
+            # Hide the inside text label for very thin segments — it would
+            # overflow into a neighbour and look broken.
+            _text = f"{_count:,} {_unit} • {_pct:.1%}" if _pct >= 0.06 else ""
+            _fig.add_bar(
+                name=_name,
+                x=[_count],
+                y=[" "],
+                orientation="h",
+                marker_color=_color,
+                text=[_text],
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="white", size=12),
+                customdata=[[_pct]],
+                hovertemplate=(
+                    f"{_name}: %{{x:,}} ({_pct:.1%} of union)<extra></extra>"
+                ),
+            )
 
-    diag_html_parts = []
-    if is_stale:
-        diag_html_parts.append(
-            "<div class='pe-stale'>⚠ Stale — extraction parameters have "
-            "changed since the last compute. Click "
-            "<b>Compute behavioral</b> again to refresh.</div>"
+        _fig.update_layout(
+            barmode="stack",
+            height=180,
+            margin=dict(l=20, r=20, t=90, b=30),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            showlegend=True,
+            bargap=0.0,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                font=dict(size=11),
+                itemclick=False,
+                itemdoubleclick=False,
+                traceorder="normal",
+            ),
+            title=dict(
+                text=f"Across both models, {_union:,} unique {_unit}",
+                font=dict(size=13, color="#0f172a"),
+                x=0,
+                xanchor="left",
+                y=0.97,
+                yanchor="top",
+                yref="container",
+            ),
+            font=dict(family="sans-serif", color="#334155"),
         )
-    diag_html_parts.append(
-        "<div class='pe-diag'>" + "\n".join(lines) + "</div>"
-    )
-    diagnostics_html = "".join(diag_html_parts)
+        _fig.update_xaxes(visible=False, range=[0, _union])
+        _fig.update_yaxes(visible=False)
+        fig_behavioral = _fig
+    return (fig_behavioral,)
 
-    plural = "s" if ngram_counts["total_1"] != 1 else ""
-    ngram_summary_html = (
-        "<div class='pe-muted' style='line-height:1.7;'>"
-        f"<b>n = {ngram_counts['n']}</b>: Model 1 produced "
-        f"<b>{ngram_counts['total_1']}</b> distinct n-gram{plural}; "
-        f"Model 2 produced <b>{ngram_counts['total_2']}</b>.<br>"
-        f"<b>{ngram_counts['shared']}</b> shared "
-        f"(<b>{ngram_counts['overlap_pct']:.1%}</b> of the union of "
-        f"<b>{ngram_counts['union']}</b>).<br>"
-        f"<b>{ngram_counts['only_1']}</b> unique to Model 1, "
-        f"<b>{ngram_counts['only_2']}</b> unique to Model 2."
+
+@app.cell
+def _behavioral_diagnostics(behavioral_kind, metric_radio, ngram_n, tr1, tr2):
+    # One quiet sentence per model: status, then the underlying counts
+    # (sound / partial / loop-cap when nonzero), then truncation notes
+    # when present. Replaces the colored badge + pill chips, which read
+    # as more important than the KPI below them.
+    def _chips_for(label, tr):
+        d = tr.diagnostics
+        status_text = d.status.value.replace("_", " ")
+        parts = [
+            f"{d.sound_variant_count:,} sound",
+            f"{d.partial_trace_count:,} partial",
+        ]
+        loop_total = sum(d.loop_cap_hits.values())
+        if loop_total:
+            parts.append(f"{loop_total:,} loop-cap")
+        notes = []
+        if d.truncated_by_timeout:
+            notes.append("timed out")
+        if d.truncated_by_active_cap:
+            notes.append("active-set cap")
+        counts = ", ".join(parts)
+        notes_clause = f"; truncated by {', '.join(notes)}" if notes else ""
+        return f"<div>{label}: {status_text}; {counts}{notes_clause}.</div>"
+
+    diagnostics_html = (
+        "<div class='pe-muted' style='padding:2px 0 4px 0;'>"
+        f"{_chips_for('Model 1', tr1)}"
+        f"{_chips_for('Model 2', tr2)}"
         "</div>"
     )
+
+    # Reactive trace extraction means the diagnostics block is always
+    # current — kept here as a constant so downstream cells (hybrid card)
+    # don't have to special-case its absence.
+    is_stale = False
 
     # Headline score label honors the kind + n + metric.
     if behavioral_kind.value == "N-gram":
         score_label = f"n-gram, n={ngram_n.value}, {metric_radio.value}"
     else:
         score_label = metric_radio.value
-    return diagnostics_html, is_stale, ngram_summary_html, score_label
+    return diagnostics_html, is_stale, score_label
 
 
 @app.cell
 def _behavioral_card(
-    CATEGORY_COLORS,
     active_score,
     behavioral_kind,
     card,
     diagnostics_html,
+    fig_behavioral,
     fmt_pct,
     kpi_html,
     mo,
     ngram_n,
-    ngram_summary_html,
     score_label,
 ):
     _b_headline = mo.Html(
         kpi_html(
             f"Behavioral ({score_label})",
             fmt_pct(active_score),
-            CATEGORY_COLORS["behavioral"],
+            "#2c3e50",
         )
     )
     card(
         "Behavioral similarity",
-        mo.hstack([behavioral_kind, ngram_n], justify="start", gap=2),
+        mo.hstack([behavioral_kind, ngram_n], widths="equal", gap=2),
         mo.Html(diagnostics_html),
-        mo.Html(ngram_summary_html),
+        fig_behavioral,
         _b_headline,
     )
     return
