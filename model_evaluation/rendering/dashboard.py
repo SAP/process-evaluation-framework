@@ -194,7 +194,7 @@ class BPMNSimilarityDashboard:
         # whenever fresh traces are available (initial Compute, or n-slider
         # change with non-stale traces). Cleared implicitly by treating
         # _last_trace_result_1 is None as "no n-gram data yet".
-        self._last_ngram_metrics = None  # {"n", "jaccard", "dice", "overlap"}
+        self._last_ngram_metrics = None  # {"n", and one key per metric (jaccard/dice/overlap/precision/recall/f1)}
         self._last_top_ngrams = None     # (top_shared, top_only_1, top_only_2)
         self._last_ngram_n = None        # the n that the cache above is for
 
@@ -316,6 +316,7 @@ class BPMNSimilarityDashboard:
         self.metric_buttons = {
             "dice": widgets.Button(description="Dice", button_style="primary"),
             "jaccard": widgets.Button(description="Jaccard", button_style=""),
+            "overlap": widgets.Button(description="Overlap", button_style=""),
             "precision": widgets.Button(description="Precision", button_style=""),
             "recall": widgets.Button(description="Recall", button_style=""),
             "f1": widgets.Button(description="F1", button_style=""),
@@ -342,6 +343,12 @@ class BPMNSimilarityDashboard:
         # Only created (and shown) when the behavioral hooks were provided.
         if self._behavioral_enabled:
             self.behavioral_html = widgets.HTML(value="")
+            # Headline behavioral score lives in its own widget so it can be
+            # placed at the bottom of the N-gram subpanel — visually adjacent
+            # to the chart and tables that explain the number — while the
+            # diagnostics block above (stale banner, soundness warnings,
+            # trace counts) stays near the Compute button.
+            self.behavioral_score_html = widgets.HTML(value="")
 
             self.trace_timeout_slider = widgets.FloatSlider(
                 value=self.current_trace_timeout,
@@ -912,8 +919,17 @@ class BPMNSimilarityDashboard:
     def _render_behavioral(self):
         """Render the behavioral output area.
 
-        Builds the entire content as one HTML string and assigns it to
-        ``self.behavioral_html.value`` in a single atomic step. Avoids the
+        Writes two atomic HTML blobs:
+
+        - ``self.behavioral_html`` — diagnostics block (stale banner,
+          soundness warnings, trace counts, "Traces matched exactly").
+          Lives next to the Compute button at the top of the section.
+        - ``self.behavioral_score_html`` — the big headline number with
+          its ``(metric)`` parenthetical. Placed at the bottom of the
+          N-gram subpanel so it sits beneath the chart and tables that
+          explain it.
+
+        Both go through atomic ``.value`` replacement to avoid the
         Output()+clear_output(wait=True)+print/display stacking artifact
         seen in VS Code's Jupyter renderer.
         """
@@ -931,6 +947,10 @@ class BPMNSimilarityDashboard:
                 "Click 'Compute behavioral' to extract traces and score them."
                 "</div>"
             )
+            # Score widget shows nothing pre-compute — the placeholder
+            # message above already covers the empty state, and an empty
+            # widget keeps the under-the-chart slot collapsed cleanly.
+            self.behavioral_score_html.value = ""
             return
 
         tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
@@ -978,7 +998,8 @@ class BPMNSimilarityDashboard:
         # n-gram kind, neither side produced any n-grams at this n).
         active_score = self._active_behavioral_score()
         if active_score is None:
-            self.behavioral_html.value = text_block + (
+            self.behavioral_html.value = text_block
+            self.behavioral_score_html.value = (
                 "<div style='font-size:20px; color:#7f8c8d; "
                 "margin-top:10px; font-style:italic;'>"
                 "Behavioral: N/A — no traces could be extracted from "
@@ -1014,7 +1035,8 @@ class BPMNSimilarityDashboard:
             f"({label})</span>"
             f"</div>"
         )
-        self.behavioral_html.value = text_block + score_block
+        self.behavioral_html.value = text_block
+        self.behavioral_score_html.value = score_block
 
     # ----- N-gram subpanel (lives inside the Behavioral section) -----
 
@@ -1054,19 +1076,24 @@ class BPMNSimilarityDashboard:
 
         n = self.current_ngram_n
         tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
+        # All six metrics are computed and cached so the n-gram chart can
+        # show every metric as a bar (matching the global metric panel) and
+        # the active one is highlighted to indicate which feeds the
+        # headline number. Computing all six is cheap relative to trace
+        # extraction — set ops over already-extracted ngram lists.
         self._last_ngram_metrics = {
             "n": n,
             "jaccard": calculate_ngram_similarity(tr1, tr2, n=n, method="jaccard"),
             "dice": calculate_ngram_similarity(tr1, tr2, n=n, method="dice"),
             "overlap": calculate_ngram_similarity(tr1, tr2, n=n, method="overlap"),
+            "precision": calculate_ngram_similarity(tr1, tr2, n=n, method="precision"),
+            "recall": calculate_ngram_similarity(tr1, tr2, n=n, method="recall"),
+            "f1": calculate_ngram_similarity(tr1, tr2, n=n, method="f1"),
         }
-        # Headline n-gram score at the active metric. Kept separate from the
-        # fixed jaccard/dice/overlap trio above (which always renders all
-        # three on the subpanel chart) so the headline can also reflect
-        # precision/recall/f1 when the user picks them.
-        self._last_behavioral_ngram_score = calculate_ngram_similarity(
-            tr1, tr2, n=n, method=self.current_metric,
-        )
+        # Headline n-gram score at the active metric. Pulled from the cache
+        # above rather than recomputed — same value, separately named so the
+        # _active_behavioral_score() consumer has a clear single field to read.
+        self._last_behavioral_ngram_score = self._last_ngram_metrics[self.current_metric]
         self._last_top_ngrams = self._compute_top_ngrams(
             tr1, tr2, n, k=self._ngram_top_k
         )
@@ -1132,14 +1159,37 @@ class BPMNSimilarityDashboard:
         self._render_top_ngrams()
 
     def _render_ngram_chart(self):
-        """Render the three-bar n-gram similarity chart to the Image widget."""
+        """Render the n-gram similarity chart to the Image widget.
+
+        One bar per metric in the global panel's order (dice, jaccard,
+        overlap, precision, recall, f1). The bar at ``self.current_metric``
+        is highlighted (full alpha + dark edge) to indicate which value
+        feeds the headline behavioral number when the Behavioral
+        representation selector is on N-gram. Mirrors the metric_buttons
+        ``button_style="primary"`` visual at line 471.
+        """
         metrics = self._last_ngram_metrics
-        labels = ["Jaccard", "Dice", "Overlap"]
-        values = [metrics["jaccard"], metrics["dice"], metrics["overlap"]]
+        keys = ["dice", "jaccard", "overlap", "precision", "recall", "f1"]
+        labels = ["Dice", "Jaccard", "Overlap", "Precision", "Recall", "F1"]
+        values = [metrics[k] for k in keys]
+        alphas = [1.0 if k == self.current_metric else 0.45 for k in keys]
+        edges = ["#2c3e50" if k == self.current_metric else "none" for k in keys]
+        edge_widths = [1.5 if k == self.current_metric else 0.0 for k in keys]
         bar_color = CATEGORY_COLORS["behavioral"]
 
-        fig, ax = plt.subplots(figsize=(8, 3))
-        bars = ax.bar(labels, values, color=bar_color, alpha=0.85)
+        # Six bars need a touch more horizontal room than the original
+        # three; (10, 3) keeps the labels readable without stretching the
+        # whole dashboard layout.
+        fig, ax = plt.subplots(figsize=(10, 3))
+        bars = ax.bar(
+            labels, values, color=bar_color,
+            alpha=1.0,  # per-bar alpha set via the patches loop below
+            edgecolor=edges, linewidth=edge_widths,
+        )
+        # matplotlib's bar() applies a single alpha to all patches; iterate
+        # to set per-bar alphas so the active bar reads as "selected".
+        for patch, a in zip(bars, alphas):
+            patch.set_alpha(a)
         ax.set_ylim(0, 1.05)
         ax.set_ylabel("Similarity")
         ax.grid(axis="y", alpha=0.3)
@@ -1418,6 +1468,10 @@ class BPMNSimilarityDashboard:
                 self.ngram_n_slider,
                 self.ngram_chart_image,
                 self.ngram_top_html,
+                # Headline behavioral score lives here — under the chart
+                # and tables that explain it. _render_behavioral writes
+                # into this widget separately from self.behavioral_html.
+                self.behavioral_score_html,
                 widgets.HTML("<hr><h3>Hybrid Similarity</h3>"),
                 self.hybrid_weight_slider,
                 self.hybrid_output,
