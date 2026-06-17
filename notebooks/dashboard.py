@@ -153,8 +153,65 @@ def _theme(mo):
             return "N/A"
         return f"{x:.1%}"
 
+    def normalization_summary_html(name_mappings):
+        """Short summary of what the normalization threshold did:
+        total count, per-category breakdown, and 3 example mappings.
+
+        ``name_mappings`` is the dict returned by ``normalize_atomic_names``:
+        keys are scopes (``activity_names``, ``event_names``, …, plus
+        ``*__subprocess`` variants) and values are ``{model2_name: model1_name}``
+        dicts.
+        """
+        # Category labels in display order; merge top-level + __subprocess scopes.
+        categories = [
+            ("activities", ["activity_names", "activity_names__subprocess"]),
+            ("events",     ["event_names",    "event_names__subprocess"]),
+            ("gateways",   ["gateway_names",  "gateway_names__subprocess"]),
+            ("pools",      ["pool_names"]),
+            ("lanes",      ["lane_names"]),
+        ]
+        counts = {}
+        for label, keys in categories:
+            n = sum(len(name_mappings.get(k, {})) for k in keys)
+            if n:
+                counts[label] = n
+        total = sum(counts.values())
+
+        if total == 0:
+            return mo.md(
+                "_No names from Model 2 were aligned at the current threshold._"
+            )
+
+        breakdown = ", ".join(f"{n} {label}" for label, n in counts.items())
+
+        # First 3 examples across all scopes, in the iteration order above.
+        examples = []
+        for _, keys in categories:
+            for k in keys:
+                for src, dst in name_mappings.get(k, {}).items():
+                    examples.append((src, dst))
+                    if len(examples) == 3:
+                        break
+                if len(examples) == 3:
+                    break
+            if len(examples) == 3:
+                break
+
+        examples_html = "".join(
+            f"<li><code>{src}</code> → <code>{dst}</code></li>"
+            for src, dst in examples
+        )
+        return mo.Html(
+            f"<div class='pe-muted' style='padding:4px 0 0 0;'>"
+            f"<div><strong>{total}</strong> names from Model 2 mapped to Model 1 "
+            f"({breakdown}).</div>"
+            f"<div style='margin-top:4px;'>Examples:</div>"
+            f"<ul style='margin:2px 0 0 1.2em; padding:0;'>{examples_html}</ul>"
+            f"</div>"
+        )
+
     mo.output.append(mo.Html(CARD_CSS))
-    return card, fmt_pct, kpi_html
+    return card, fmt_pct, kpi_html, normalization_summary_html
 
 
 @app.cell
@@ -326,7 +383,7 @@ def _global_controls(mo):
 
 
 @app.cell
-def _global_card(card, metric_radio, mo, threshold_slider):
+def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_html, threshold_slider):
     card(
         "Global controls",
         mo.md(
@@ -334,7 +391,14 @@ def _global_card(card, metric_radio, mo, threshold_slider):
             "The threshold drives semantic name alignment; "
             "the metric is used for both structural and behavioral set comparisons."
         ),
-        mo.hstack([metric_radio, threshold_slider], justify="start", gap=2),
+        mo.vstack(
+            [
+                metric_radio,
+                threshold_slider,
+                normalization_summary_html(name_mappings),
+            ],
+            gap=1,
+        ),
     )
     return
 
@@ -352,7 +416,7 @@ def _structural_compute(
     # Pure-reactive normalization + structural similarity. Recomputes on
     # threshold or metric change. For example-sized models this is fast enough
     # to run live; gate behind a run_button if dogfood says otherwise.
-    m2_aligned, _name_mappings = normalize_atomic_names(
+    m2_aligned, name_mappings = normalize_atomic_names(
         model_1_json,
         model_2_json,
         cosine_sim_optimized,
@@ -361,58 +425,130 @@ def _structural_compute(
     struct_result = calculate_bpmn_similarity(
         model_1_json, m2_aligned, method=metric_radio.value
     )
-    return m2_aligned, struct_result
+    return m2_aligned, name_mappings, struct_result
 
 
 @app.cell
-def _structural_weight_sliders(mo, struct_result):
-    # One slider per high-level category, in percent. Defaults pulled from
-    # the result's ``weights_used``. Disabled when the corresponding score is
-    # None (no data in either model on that axis).
+def _structural_weight_state(mo, struct_result):
+    # Shared state for the four weight sliders, keyed by category. Sliders
+    # both read from and write to this state, which lets the "Normalize"
+    # button rewrite all four values in one go and have the sliders re-render
+    # at the new positions.
+    _weights_used = struct_result.get("weights_used", {})
+    _has_sub = struct_result.get("has_expanded_subprocess", False)
+
+    def _init(key, default_pct):
+        return int(round(_weights_used.get(key, default_pct / 100) * 100))
+
+    get_weights, set_weights = mo.state(
+        {
+            "elements": _init("elements", 35),
+            "flows": _init("flows", 25),
+            "organizational": _init("organizational", 20),
+            "subprocess": _init("subprocess", 20) if _has_sub else 0,
+        }
+    )
+    return get_weights, set_weights
+
+
+@app.cell
+def _structural_weight_sliders(get_weights, mo, set_weights, struct_result):
+    # One slider per high-level category, in percent. Values come from the
+    # shared state cell above; an on_change handler writes the new value back
+    # so external updates (the Normalize button) and direct user drags both
+    # converge on the same source of truth. Disabled when the corresponding
+    # score is None (no data in either model on that axis).
     hls = struct_result["high_level_scores"]
-    weights_used = struct_result.get("weights_used", {})
     has_subprocess = struct_result.get("has_expanded_subprocess", False)
+    _w = get_weights()
 
-    def _w(key, default_pct):
-        return int(round(weights_used.get(key, default_pct / 100) * 100))
+    def _make(key, label, disabled, stop=100):
+        def _on_change(v, _k=key):
+            set_weights(lambda s: {**s, _k: v})
 
-    elements_w = mo.ui.slider(
-        start=0,
-        stop=100,
-        step=1,
-        value=_w("elements", 35),
-        label="Elements %",
-        show_value=True,
-        disabled=hls.get("elements") is None,
-    )
-    flows_w = mo.ui.slider(
-        start=0,
-        stop=100,
-        step=1,
-        value=_w("flows", 25),
-        label="Flows %",
-        show_value=True,
-        disabled=hls.get("flows") is None,
-    )
-    org_w = mo.ui.slider(
-        start=0,
-        stop=100,
-        step=1,
-        value=_w("organizational", 20),
-        label="Organizational %",
-        show_value=True,
-        disabled=hls.get("organizational") is None,
-    )
-    subprocess_w = mo.ui.slider(
-        start=0,
+        return mo.ui.slider(
+            start=0,
+            stop=stop,
+            step=1,
+            value=_w[key],
+            label=label,
+            show_value=True,
+            disabled=disabled,
+            on_change=_on_change,
+        )
+
+    elements_w = _make("elements", "Elements %", hls.get("elements") is None)
+    flows_w = _make("flows", "Flows %", hls.get("flows") is None)
+    org_w = _make("organizational", "Organizational %", hls.get("organizational") is None)
+    subprocess_w = _make(
+        "subprocess",
+        "Subprocess %",
+        (not has_subprocess) or hls.get("subprocess") is None,
         stop=100 if has_subprocess else 0,
-        step=1,
-        value=_w("subprocess", 20) if has_subprocess else 0,
-        label="Subprocess %",
-        show_value=True,
-        disabled=(not has_subprocess) or hls.get("subprocess") is None,
     )
     return elements_w, flows_w, org_w, subprocess_w
+
+
+@app.cell
+def _structural_weight_controls(get_weights, mo, set_weights, struct_result):
+    # "Normalize to 100%" button + a live sum indicator. Mirrors the
+    # ``_normalize_weights`` semantics from
+    # ``model_evaluation/rendering/dashboard.py:406-439``: zero out non-live
+    # categories, divide each remaining value by the live total, scale to
+    # percent. Uses largest-remainder rounding so the displayed integers sum
+    # to exactly 100 (avoids 33+33+33 = 99 artefacts).
+    _hls = struct_result["high_level_scores"]
+    _has_sub = struct_result.get("has_expanded_subprocess", False)
+    _live = {
+        k: (_hls.get(k) is not None) and (k != "subprocess" or _has_sub)
+        for k in ("elements", "flows", "organizational", "subprocess")
+    }
+    _defaults = {
+        "elements": 35,
+        "flows": 25,
+        "organizational": 20,
+        "subprocess": 20 if _has_sub else 0,
+    }
+
+    def _normalize(_event):
+        s = get_weights()
+        zeroed = {k: (s[k] if _live[k] else 0) for k in s}
+        total = sum(zeroed.values())
+        if total == 0:
+            new = {k: (_defaults[k] if _live[k] else 0) for k in s}
+            # Re-normalize defaults too, in case live keys' defaults don't
+            # already sum to 100 (e.g. no-subprocess case sums to 80).
+            d_total = sum(new.values())
+            if d_total and d_total != 100:
+                raw = {k: (new[k] / d_total) * 100 for k in s}
+            else:
+                set_weights(new)
+                return
+        else:
+            raw = {k: (zeroed[k] / total) * 100 for k in s}
+
+        floors = {k: int(raw[k]) for k in s}
+        remainder = 100 - sum(floors.values())
+        # Distribute the rounding remainder to the categories with the
+        # largest fractional parts; ties broken by dict iteration order.
+        order = sorted(s, key=lambda k: raw[k] - floors[k], reverse=True)
+        for k in order[:max(0, remainder)]:
+            floors[k] += 1
+        set_weights(floors)
+
+    normalize_button = mo.ui.button(label="Normalize to 100%", on_click=_normalize)
+
+    _w = get_weights()
+    _live_sum = sum(_w[k] for k in _w if _live[k])
+    if _live_sum == 100:
+        _msg = f"Sum (live categories): **{_live_sum}%** — normalized"
+    else:
+        _msg = (
+            f"Sum (live categories): **{_live_sum}%** — "
+            "click Normalize to rescale to 100%"
+        )
+    sum_indicator = mo.md(_msg)
+    return normalize_button, sum_indicator
 
 
 @app.cell
@@ -459,11 +595,9 @@ def _fig_weighted_contributions(
     NO_DATA_COLOR,
     fmt_pct,
     go,
-    metric_radio,
     overall,
     overall_equal,
     struct_result,
-    threshold_slider,
     weights_pct,
 ):
     # Plotly chart 1 — Weighted Contributions (left).
@@ -473,8 +607,14 @@ def _fig_weighted_contributions(
     _present_flags = [_hls.get(_k) is not None for _k in _keys]
     _raw = [_hls.get(_k) if _p else 0 for _k, _p in zip(_keys, _present_flags)]
 
+    # Normalize weights against the live-category sum so the stacked bar
+    # always sums in [0, 1] and matches the headline ``overall``, regardless
+    # of whether the user has clicked Normalize. Mirrors the live-keys
+    # rescaling in ``_structural_overall``.
+    _live_sum = sum(weights_pct[_k] for _k, _p in zip(_keys, _present_flags) if _p) or 1
     _weights_norm = [
-        weights_pct[_k] / 100.0 if weights_pct[_k] else 0 for _k in _keys
+        (weights_pct[_k] / _live_sum) if (_p and weights_pct[_k]) else 0
+        for _k, _p in zip(_keys, _present_flags)
     ]
     _weighted = [s * w if p else 0 for s, w, p in zip(_raw, _weights_norm, _present_flags)]
 
@@ -526,18 +666,6 @@ def _fig_weighted_contributions(
                     font=dict(color="#64748b", size=11, family="sans-serif"),
                 )
 
-    # Watermark with the overall score.
-    _fig.add_annotation(
-        text=fmt_pct(overall),
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=0.5,
-        font=dict(size=56, color="#2c3e50", family="sans-serif"),
-        opacity=0.18,
-        showarrow=False,
-    )
-
     _fig.update_layout(
         barmode="group",
         height=480,
@@ -545,11 +673,8 @@ def _fig_weighted_contributions(
         plot_bgcolor="white",
         paper_bgcolor="white",
         title=dict(
-            text=(
-                f"Weighted Contributions — {metric_radio.value.upper()} "
-                f"@ threshold {threshold_slider.value:.2f}"
-            ),
-            font=dict(size=13, color="#0f172a"),
+            text="<b>Weighted contributions</b>",
+            font=dict(size=15, color="#0f172a", family="sans-serif"),
             x=0,
             xanchor="left",
             y=0.97,
@@ -666,8 +791,8 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
         plot_bgcolor="white",
         paper_bgcolor="white",
         title=dict(
-            text="Element-Level Breakdown (unweighted)",
-            font=dict(size=13, color="#0f172a"),
+            text="<b>Element-level breakdown</b>",
+            font=dict(size=15, color="#0f172a", family="sans-serif"),
             x=0,
             xanchor="left",
             y=0.97,
@@ -705,24 +830,36 @@ def _structural_card(
     fmt_pct,
     kpi_html,
     mo,
+    normalize_button,
     org_w,
     overall,
     subprocess_w,
+    sum_indicator,
 ):
     # Two rows of two sliders each — at four-up the slider track and the
     # right-hand value label fight for a column that's too narrow once the
     # card padding is taken out, so the value clips. 2×2 lets each slider
-    # have ~50% of the card width and reflow as the page resizes.
+    # have ~50% of the card width and reflow as the page resizes. A third
+    # row holds the live sum indicator and the Normalize button.
     weights_row = mo.vstack(
         [
             mo.hstack([elements_w, flows_w], widths="equal", gap=2),
             mo.hstack([org_w, subprocess_w], widths="equal", gap=2),
+            mo.hstack(
+                [sum_indicator, normalize_button],
+                justify="space-between",
+                gap=2,
+            ),
         ],
         gap=1,
     )
     _s_headline = mo.Html(kpi_html("Structural overall", fmt_pct(overall), "#2c3e50"))
     charts = mo.hstack([fig_weighted, fig_breakdown], widths="equal", gap=2)
-    card("Structural similarity", weights_row, charts, _s_headline)
+    # Extra breathing room between the slider/button row and the charts —
+    # the third weights_row line otherwise sits visually flush against the
+    # chart titles.
+    _spacer = mo.Html("<div style='height:14px'></div>")
+    card("Structural similarity", weights_row, _spacer, charts, _s_headline)
     return
 
 
@@ -928,8 +1065,8 @@ def _fig_behavioral_overlap(go, mo, set_counts):
                 traceorder="normal",
             ),
             title=dict(
-                text=f"Across both models, {_union:,} unique {_unit}",
-                font=dict(size=13, color="#0f172a"),
+                text=f"<b>Across both models, {_union:,} unique {_unit}</b>",
+                font=dict(size=15, color="#0f172a", family="sans-serif"),
                 x=0,
                 xanchor="left",
                 y=0.97,
