@@ -44,6 +44,7 @@ Usage in a notebook::
     dashboard.display()
 """
 
+import html as _html
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 import matplotlib.pyplot as plt
@@ -175,6 +176,16 @@ class BPMNSimilarityDashboard:
         self._last_trace_result_2 = None
         self._last_behavioral_score = None
         self._last_behavioral_metric = None
+        # N-gram-based headline behavioral score, kept in lock-step with
+        # _last_behavioral_score so switching the kind selector is free.
+        # Refreshed by _compute_and_cache_ngram_artifacts (alongside the
+        # subpanel's fixed jaccard/dice/overlap trio) and by _set_metric.
+        self._last_behavioral_ngram_score = None
+        # Which behavioral representation drives the headline number and the
+        # hybrid score: "trace" (deduped full traces, the original behavior)
+        # or "ngram" (n-grams at current_ngram_n). The set-comparison method
+        # (current_metric) is orthogonal and applies to whichever is active.
+        self.current_behavioral_kind = "trace"
         # Triple identifying which (threshold, timeout, loop_depth) the last
         # extraction was performed against. Used to detect staleness.
         self._last_extraction_key = None
@@ -358,6 +369,21 @@ class BPMNSimilarityDashboard:
             )
             self.compute_behavioral_button.on_click(self._on_compute_behavioral)
 
+            # Behavioral representation selector. Picks which trace
+            # representation drives the headline behavioral number (and
+            # therefore the hybrid score): full deduped traces or n-grams at
+            # the current n. Mirrors the metric_buttons pattern above — the
+            # set-comparison method (current_metric) is orthogonal and
+            # applies on top of whichever kind is active.
+            self.behavioral_kind_buttons = {
+                "trace": widgets.Button(
+                    description="Full Trace", button_style="primary"
+                ),
+                "ngram": widgets.Button(description="N-gram", button_style=""),
+            }
+            for kind, button in self.behavioral_kind_buttons.items():
+                button.on_click(lambda b, k=kind: self._set_behavioral_kind(k))
+
             # N-gram subpanel widgets. Live inside the Behavioral section and
             # share its extracted traces — see _on_compute_behavioral and
             # _on_ngram_n_change. Same atomic-PNG-bytes pattern as the
@@ -464,9 +490,33 @@ class BPMNSimilarityDashboard:
                 method=self.current_metric,
             )
             self._last_behavioral_metric = self.current_metric
+            # Keep the n-gram-based headline value (and the subpanel cache)
+            # in step with the new metric, so flipping the kind selector
+            # afterwards is free.
+            self._compute_and_cache_ngram_artifacts()
             self._render_behavioral()
+            self._render_ngram_section()
+            self._render_hybrid()
 
         self._recalculate(None)
+
+    def _set_behavioral_kind(self, kind):
+        """Switch the headline behavioral representation (trace ↔ n-gram).
+
+        Both scores are kept in lock-step elsewhere (see
+        _compute_and_cache_ngram_artifacts and _set_metric), so this handler
+        is purely a re-render — no compute. Hybrid follows the active kind.
+        """
+        if kind == self.current_behavioral_kind:
+            return  # no-op; avoids a needless re-render flicker
+        self.current_behavioral_kind = kind
+
+        for name, button in self.behavioral_kind_buttons.items():
+            button.button_style = "primary" if name == kind else ""
+
+        if self._behavioral_enabled:
+            self._render_behavioral()
+            self._render_hybrid()
 
     def _on_threshold_change(self, change):
         """Handle threshold slider changes."""
@@ -847,6 +897,18 @@ class BPMNSimilarityDashboard:
         self._render_hybrid()
         self._render_ngram_section()
 
+    def _active_behavioral_score(self):
+        """Return the headline behavioral score for the current kind.
+
+        Single source of truth used by _render_behavioral and _render_hybrid
+        — switching the kind selector is a pure read here, no recompute,
+        because both values are kept in lock-step by
+        _compute_and_cache_ngram_artifacts and _set_metric.
+        """
+        if self.current_behavioral_kind == "ngram":
+            return self._last_behavioral_ngram_score
+        return self._last_behavioral_score
+
     def _render_behavioral(self):
         """Render the behavioral output area.
 
@@ -912,8 +974,10 @@ class BPMNSimilarityDashboard:
             + "</pre>"
         )
 
-        # Undefined-similarity case: both trace sets are empty.
-        if self._last_behavioral_score is None:
+        # Undefined-similarity case: both trace sets are empty (or, for the
+        # n-gram kind, neither side produced any n-grams at this n).
+        active_score = self._active_behavioral_score()
+        if active_score is None:
             self.behavioral_html.value = text_block + (
                 "<div style='font-size:20px; color:#7f8c8d; "
                 "margin-top:10px; font-style:italic;'>"
@@ -934,13 +998,20 @@ class BPMNSimilarityDashboard:
             + "\n".join(lines)
             + "</pre>"
         )
+        # Headline label reflects both the representation kind and the
+        # set-comparison method. For the n-gram kind we also show n so the
+        # number is fully self-describing.
+        if self.current_behavioral_kind == "ngram":
+            label = f"n-gram, n={self.current_ngram_n}, {self._last_behavioral_metric}"
+        else:
+            label = f"{self._last_behavioral_metric}"
         score_block = (
             f"<div style='font-size:28px; font-weight:bold; "
             f"color:#2c3e50; margin-top:10px;'>"
-            f"Behavioral: {self._last_behavioral_score:.1%} "
+            f"Behavioral: {active_score:.1%} "
             f"<span style='font-size:14px; color:#7f8c8d; "
             f"font-weight:normal;'>"
-            f"({self._last_behavioral_metric})</span>"
+            f"({label})</span>"
             f"</div>"
         )
         self.behavioral_html.value = text_block + score_block
@@ -958,6 +1029,12 @@ class BPMNSimilarityDashboard:
         self.current_ngram_n = change["new"]
         if self._last_trace_result_1 is not None and not self._behavioral_is_stale():
             self._compute_and_cache_ngram_artifacts()
+            # Headline behavioral and hybrid follow n when the n-gram kind
+            # is active. Cheap (no extraction) so we always re-render rather
+            # than guarding on the active kind — keeps the label's
+            # `n=N` annotation consistent if the user flips kind right after.
+            self._render_behavioral()
+            self._render_hybrid()
         # If traces are stale we skip the recompute and let the next render
         # show the STALE banner with whatever n the cache was last built at.
         self._render_ngram_section()
@@ -983,6 +1060,13 @@ class BPMNSimilarityDashboard:
             "dice": calculate_ngram_similarity(tr1, tr2, n=n, method="dice"),
             "overlap": calculate_ngram_similarity(tr1, tr2, n=n, method="overlap"),
         }
+        # Headline n-gram score at the active metric. Kept separate from the
+        # fixed jaccard/dice/overlap trio above (which always renders all
+        # three on the subpanel chart) so the headline can also reflect
+        # precision/recall/f1 when the user picks them.
+        self._last_behavioral_ngram_score = calculate_ngram_similarity(
+            tr1, tr2, n=n, method=self.current_metric,
+        )
         self._last_top_ngrams = self._compute_top_ngrams(
             tr1, tr2, n, k=self._ngram_top_k
         )
@@ -1090,7 +1174,12 @@ class BPMNSimilarityDashboard:
 
         def _fmt_row(item):
             ngram, count = item
-            arrow_seq = " → ".join(ngram)
+            # Escape every token before joining: padded n-grams contain the
+            # literal strings "<START>" / "<END>", and activity names can
+            # contain user-supplied "<" / ">" / "&". Without escaping, the
+            # browser parses those as unknown HTML tags and silently drops
+            # them, hiding the boundary information from the rendered list.
+            arrow_seq = " → ".join(_html.escape(tok) for tok in ngram)
             return (
                 f"<li><code>{arrow_seq}</code> "
                 f"<span style='color:#7f8c8d;'>×{count}</span></li>"
@@ -1163,7 +1252,7 @@ class BPMNSimilarityDashboard:
             return
 
         structural_overall = self._last_overall
-        beh_score = self._last_behavioral_score
+        beh_score = self._active_behavioral_score()
         behavioral_was_computed = self._last_trace_result_1 is not None
 
         # "Not yet computed" placeholder: either structural hasn't rendered
@@ -1243,9 +1332,16 @@ class BPMNSimilarityDashboard:
             elif hybrid['behavioral'] is None:
                 note = " <span style='font-size:14px; color:#7f8c8d; font-weight:normal;'>(structural only)</span>"
             else:
+                if self.current_behavioral_kind == "ngram":
+                    metric_label = (
+                        f"n-gram, n={self.current_ngram_n}, "
+                        f"{self.current_metric}"
+                    )
+                else:
+                    metric_label = self.current_metric
                 note = (
                     f" <span style='font-size:14px; color:#7f8c8d; "
-                    f"font-weight:normal;'>(metric: {self.current_metric})</span>"
+                    f"font-weight:normal;'>(metric: {metric_label})</span>"
                 )
             hybrid_line = (
                 f"<div style='font-size:36px; font-weight:bold; "
@@ -1306,8 +1402,13 @@ class BPMNSimilarityDashboard:
             self._render_behavioral()
             self._render_hybrid()
             self._render_ngram_section()
+            behavioral_kind_box = widgets.HBox(
+                list(self.behavioral_kind_buttons.values())
+            )
             sections.extend([
                 widgets.HTML("<hr><h3>Behavioral Similarity</h3>"),
+                widgets.HTML("<b>Behavioral representation:</b>"),
+                behavioral_kind_box,
                 widgets.HTML("<b>Trace extraction parameters:</b>"),
                 self.trace_timeout_slider,
                 self.loop_depth_slider,
