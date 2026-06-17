@@ -44,7 +44,6 @@ Usage in a notebook::
     dashboard.display()
 """
 
-import html as _html
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 import matplotlib.pyplot as plt
@@ -106,7 +105,6 @@ class BPMNSimilarityDashboard:
         initial_max_loop_depth=3,
         initial_structural_weight=0.5,
         initial_ngram_n=2,
-        initial_ngram_top_k=5,
     ):
         """
         Args:
@@ -138,8 +136,6 @@ class BPMNSimilarityDashboard:
                 (default 2 — bigrams). The slider in the Behavioral section
                 exposes n=1..5; changing it only re-runs the (cheap) n-gram
                 math, never the (expensive) trace extraction.
-            initial_ngram_top_k: How many top n-grams to display in each of
-                the shared / unique-to-1 / unique-to-2 lists (default 5).
         """
         self.model_1 = model_1
         self.model_2 = model_2
@@ -161,7 +157,6 @@ class BPMNSimilarityDashboard:
         self.current_trace_timeout = initial_trace_timeout
         self.current_max_loop_depth = initial_max_loop_depth
         self.current_ngram_n = initial_ngram_n
-        self._ngram_top_k = initial_ngram_top_k
 
         # Threshold used for the cached initial normalization (so we know when
         # the user has dragged the slider to a different value and we need to
@@ -176,27 +171,16 @@ class BPMNSimilarityDashboard:
         self._last_trace_result_2 = None
         self._last_behavioral_score = None
         self._last_behavioral_metric = None
-        # N-gram-based headline behavioral score, kept in lock-step with
-        # _last_behavioral_score so switching the kind selector is free.
-        # Refreshed by _compute_and_cache_ngram_artifacts (alongside the
-        # subpanel's fixed jaccard/dice/overlap trio) and by _set_metric.
         self._last_behavioral_ngram_score = None
-        # Which behavioral representation drives the headline number and the
-        # hybrid score: "trace" (deduped full traces, the original behavior)
-        # or "ngram" (n-grams at current_ngram_n). The set-comparison method
-        # (current_metric) is orthogonal and applies to whichever is active.
         self.current_behavioral_kind = "trace"
         # Triple identifying which (threshold, timeout, loop_depth) the last
         # extraction was performed against. Used to detect staleness.
         self._last_extraction_key = None
 
-        # N-gram subpanel state. Filled by _compute_and_cache_ngram_artifacts
-        # whenever fresh traces are available (initial Compute, or n-slider
-        # change with non-stale traces). Cleared implicitly by treating
-        # _last_trace_result_1 is None as "no n-gram data yet".
-        self._last_ngram_metrics = None  # {"n", and one key per metric (jaccard/dice/overlap/precision/recall/f1)}
-        self._last_top_ngrams = None     # (top_shared, top_only_1, top_only_2)
-        self._last_ngram_n = None        # the n that the cache above is for
+        # N-gram subpanel state. Filled by _compute_and_cache_ngram_artifacts.
+        self._last_ngram_metrics = None
+        self._last_ngram_counts = None
+        self._last_ngram_n = None
 
         # Hybrid weight slider initial value, used by _create_widgets.
         self._initial_structural_weight = initial_structural_weight
@@ -255,10 +239,6 @@ class BPMNSimilarityDashboard:
 
     def _create_widgets(self):
         """Create all interactive widgets."""
-        # Chart area: an Image widget whose `value` we set to PNG bytes on
-        # every render. Atomic replacement — VS Code's Jupyter renderer (and
-        # JupyterLab and Classic) all just swap the bytes, so the chart can
-        # never stack the way it does inside an Output widget on VS Code.
         self.chart_image = widgets.Image(format="png")
         self.message_output = widgets.Output()
 
@@ -404,12 +384,11 @@ class BPMNSimilarityDashboard:
                 style={'description_width': '140px'}
             )
             self.ngram_n_slider.observe(self._on_ngram_n_change, names="value")
-            self.ngram_chart_image = widgets.Image(format="png")
-            # Atomic-HTML pattern (mirrors chart_image's atomic-PNG). Setting
-            # .value replaces the rendered DOM in one shot in every Jupyter
-            # frontend; an Output() widget with clear_output(wait=True)+display
-            # has been observed to *stack* in VS Code's renderer (the same
-            # bug the structural chart's Image refactor was built to avoid).
+            # Single HTML widget renders the n-gram subpanel: a few lines of
+            # text reporting per-side / shared / unique counts. The headline
+            # behavioral score (one widget below this section) already shows
+            # the active metric's value, so we do NOT render a per-metric
+            # bar chart here.
             self.ngram_top_html = widgets.HTML(value="")
 
             # Hybrid section.
@@ -497,9 +476,6 @@ class BPMNSimilarityDashboard:
                 method=self.current_metric,
             )
             self._last_behavioral_metric = self.current_metric
-            # Keep the n-gram-based headline value (and the subpanel cache)
-            # in step with the new metric, so flipping the kind selector
-            # afterwards is free.
             self._compute_and_cache_ngram_artifacts()
             self._render_behavioral()
             self._render_ngram_section()
@@ -628,11 +604,6 @@ class BPMNSimilarityDashboard:
 
         data_presence = result.get("data_presence", {})
 
-        # Build the figure off-screen (no Output widget context, no pyplot
-        # display dispatch) — we just want the PNG bytes. The chart_image
-        # widget receives those bytes via .value and atomically replaces
-        # whatever was there. No stacking is possible because Image has a
-        # single byte-value attribute, not a list of outputs.
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
         # === LEFT CHART: Weighted Category Scores ===
@@ -895,9 +866,7 @@ class BPMNSimilarityDashboard:
             self.current_max_loop_depth,
         )
 
-        # Fresh traces — fill the n-gram cache at the current n. This is
-        # cheap relative to extract_traces above; the n-slider can later
-        # repopulate this without re-extracting.
+        # Fresh traces — fill the n-gram cache at the current n.
         self._compute_and_cache_ngram_artifacts()
 
         self._render_behavioral()
@@ -1076,11 +1045,12 @@ class BPMNSimilarityDashboard:
 
         n = self.current_ngram_n
         tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
-        # All six metrics are computed and cached so the n-gram chart can
-        # show every metric as a bar (matching the global metric panel) and
-        # the active one is highlighted to indicate which feeds the
-        # headline number. Computing all six is cheap relative to trace
-        # extraction — set ops over already-extracted ngram lists.
+        # All six metrics are computed and cached so the headline behavioral
+        # score (and the hybrid line below it) can flip instantly when the
+        # user clicks a different metric in the global panel — no need to
+        # recompute or re-extract traces. Computing all six is cheap relative
+        # to trace extraction (set ops over the already-extracted n-gram
+        # lists).
         self._last_ngram_metrics = {
             "n": n,
             "jaccard": calculate_ngram_similarity(tr1, tr2, n=n, method="jaccard"),
@@ -1094,203 +1064,115 @@ class BPMNSimilarityDashboard:
         # above rather than recomputed — same value, separately named so the
         # _active_behavioral_score() consumer has a clear single field to read.
         self._last_behavioral_ngram_score = self._last_ngram_metrics[self.current_metric]
-        self._last_top_ngrams = self._compute_top_ngrams(
-            tr1, tr2, n, k=self._ngram_top_k
-        )
+        self._last_ngram_counts = self._compute_ngram_counts(tr1, tr2, n)
         self._last_ngram_n = n
 
-    def _compute_top_ngrams(self, traces_1, traces_2, n, k=5):
-        """Return ``(top_shared, top_only_1, top_only_2)`` n-gram lists.
+    def _compute_ngram_counts(self, traces_1, traces_2, n):
+        """Return per-side / shared / unique distinct-n-gram counts.
 
-        Each list is up to ``k`` entries of ``(ngram_tuple, count)`` sorted
-        by count descending. For shared n-grams the count is the combined
-        frequency across both sides; for unique n-grams it's the frequency
-        on the side it came from.
+        The n-gram subpanel shows a short text summary instead of an
+        enumerated list of top n-grams, so we only need cardinalities of the
+        distinct-n-gram sets, not the n-grams themselves. This keeps the
+        renderer free of any extract_ngrams call at refresh time.
 
-        Padding is left enabled (``<START>`` / ``<END>`` show up as
-        boundary markers) so the lists match the similarity scores, which
-        also use padding.
+        Padding is left enabled (matches the similarity scores, which also
+        use padding) so the boundary markers ``<START>`` / ``<END>`` count
+        the same way they do upstream.
         """
-        from collections import Counter
         from trace_extraction import extract_ngrams
 
-        ngrams_1 = extract_ngrams(traces_1, n=n, pad=True)
-        ngrams_2 = extract_ngrams(traces_2, n=n, pad=True)
-        c1, c2 = Counter(ngrams_1), Counter(ngrams_2)
-        shared = c1.keys() & c2.keys()
-        only_1 = c1.keys() - c2.keys()
-        only_2 = c2.keys() - c1.keys()
-        top_shared = sorted(
-            ((g, c1[g] + c2[g]) for g in shared), key=lambda x: -x[1]
-        )[:k]
-        top_only_1 = sorted(
-            ((g, c1[g]) for g in only_1), key=lambda x: -x[1]
-        )[:k]
-        top_only_2 = sorted(
-            ((g, c2[g]) for g in only_2), key=lambda x: -x[1]
-        )[:k]
-        return top_shared, top_only_1, top_only_2
+        ngrams_1 = set(extract_ngrams(traces_1, n=n, pad=True))
+        ngrams_2 = set(extract_ngrams(traces_2, n=n, pad=True))
+        shared = len(ngrams_1 & ngrams_2)
+        only_1 = len(ngrams_1 - ngrams_2)
+        only_2 = len(ngrams_2 - ngrams_1)
+        union = shared + only_1 + only_2
+        # Jaccard-style overlap on the union — matches what users see on the
+        # headline behavioral score when "jaccard" is the active metric, and
+        # gives a meaningful 0% / 100% even when the two sides are very
+        # different sizes.
+        overlap_pct = (shared / union) if union else 0.0
+        return {
+            "total_1": len(ngrams_1),
+            "total_2": len(ngrams_2),
+            "shared": shared,
+            "only_1": only_1,
+            "only_2": only_2,
+            "union": union,
+            "overlap_pct": overlap_pct,
+        }
 
     def _render_ngram_section(self):
-        """Top-level renderer for the n-gram subpanel."""
+        """Top-level renderer for the n-gram subpanel.
+
+        Writes a short text summary of n-gram cardinalities into the single
+        ``ngram_top_html`` widget. The headline behavioral score (rendered
+        one widget below by ``_render_behavioral``) carries the value of
+        the globally-selected metric, so this section deliberately does
+        not duplicate that as a chart.
+        """
         if not self._behavioral_enabled:
             return
 
-        # No traces extracted yet → show a placeholder PNG and clear the
-        # top-output. Atomic-HTML reset.
+        # No traces extracted yet → show a one-line placeholder. Atomic
+        # value replacement, same anti-stacking pattern as behavioral_html.
         if self._last_trace_result_1 is None:
-            self.ngram_chart_image.value = self._placeholder_png(
-                "Click 'Compute behavioral' above to populate n-gram analysis."
+            self.ngram_top_html.value = (
+                "<div style='font-family:sans-serif; font-size:12px; "
+                "color:#7f8c8d;'><i>Click 'Compute behavioral' above to "
+                "populate n-gram analysis.</i></div>"
             )
-            self.ngram_top_html.value = ""
             return
 
         # n-only drift while traces are still fresh: recompute cheaply so the
-        # chart and lists reflect the slider position immediately. Stale
-        # traces (threshold/timeout/loop-depth drift) are NOT silently
-        # recomputed — we keep showing the last cache and annotate STALE.
+        # summary reflects the slider position immediately. Stale traces
+        # (threshold/timeout/loop-depth drift) are NOT silently recomputed —
+        # we keep showing the last cache and annotate STALE in the summary.
         if (
             self._last_ngram_n != self.current_ngram_n
             and not self._behavioral_is_stale()
         ):
             self._compute_and_cache_ngram_artifacts()
 
-        self._render_ngram_chart()
-        self._render_top_ngrams()
+        self._render_ngram_summary()
 
-    def _render_ngram_chart(self):
-        """Render the n-gram similarity chart to the Image widget.
-
-        One bar per metric in the global panel's order (dice, jaccard,
-        overlap, precision, recall, f1). The bar at ``self.current_metric``
-        is highlighted (full alpha + dark edge) to indicate which value
-        feeds the headline behavioral number when the Behavioral
-        representation selector is on N-gram. Mirrors the metric_buttons
-        ``button_style="primary"`` visual at line 471.
-        """
-        metrics = self._last_ngram_metrics
-        keys = ["dice", "jaccard", "overlap", "precision", "recall", "f1"]
-        labels = ["Dice", "Jaccard", "Overlap", "Precision", "Recall", "F1"]
-        values = [metrics[k] for k in keys]
-        alphas = [1.0 if k == self.current_metric else 0.45 for k in keys]
-        edges = ["#2c3e50" if k == self.current_metric else "none" for k in keys]
-        edge_widths = [1.5 if k == self.current_metric else 0.0 for k in keys]
-        bar_color = CATEGORY_COLORS["behavioral"]
-
-        # Six bars need a touch more horizontal room than the original
-        # three; (10, 3) keeps the labels readable without stretching the
-        # whole dashboard layout.
-        fig, ax = plt.subplots(figsize=(10, 3))
-        bars = ax.bar(
-            labels, values, color=bar_color,
-            alpha=1.0,  # per-bar alpha set via the patches loop below
-            edgecolor=edges, linewidth=edge_widths,
-        )
-        # matplotlib's bar() applies a single alpha to all patches; iterate
-        # to set per-bar alphas so the active bar reads as "selected".
-        for patch, a in zip(bars, alphas):
-            patch.set_alpha(a)
-        ax.set_ylim(0, 1.05)
-        ax.set_ylabel("Similarity")
-        ax.grid(axis="y", alpha=0.3)
+    def _render_ngram_summary(self):
+        """Render the n-gram cardinality summary as a few lines of HTML."""
+        counts = self._last_ngram_counts
+        n = self._last_ngram_n
+        stale = self._behavioral_is_stale()
         stale_suffix = (
-            " — STALE: re-Compute" if self._behavioral_is_stale() else ""
+            " <i style='color:#c0392b;'>— stale, re-Compute behavioral</i>"
+            if stale else ""
         )
-        ax.set_title(
-            f"N-gram similarity (n={metrics['n']}){stale_suffix}"
-        )
-        for bar, v in zip(bars, values):
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                v + 0.02,
-                f"{v:.1%}",
-                ha="center", fontsize=9, weight="bold",
-            )
-        fig.tight_layout()
 
-        # Same off-screen-render → PNG bytes flow as _update_visualization.
-        # plt.close is mandatory: it drops the figure from pyplot's registry
-        # so the inline backend's flush_figures hook can't re-emit it on the
-        # next cell run.
-        import io
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
-        plt.close(fig)
-        self.ngram_chart_image.value = buf.getvalue()
-
-    def _render_top_ngrams(self):
-        """Render the top shared / unique n-gram lists as HTML."""
-        top_shared, top_only_1, top_only_2 = self._last_top_ngrams
-
-        def _fmt_row(item):
-            ngram, count = item
-            # Escape every token before joining: padded n-grams contain the
-            # literal strings "<START>" / "<END>", and activity names can
-            # contain user-supplied "<" / ">" / "&". Without escaping, the
-            # browser parses those as unknown HTML tags and silently drops
-            # them, hiding the boundary information from the rendered list.
-            arrow_seq = " → ".join(_html.escape(tok) for tok in ngram)
-            return (
-                f"<li><code>{arrow_seq}</code> "
-                f"<span style='color:#7f8c8d;'>×{count}</span></li>"
-            )
-
-        def _block(title, items, empty_msg):
-            if items:
-                body = "".join(_fmt_row(it) for it in items)
-            else:
-                body = f"<li><i>{empty_msg}</i></li>"
-            return (
-                f"<div style='flex:1; min-width:240px;'>"
-                f"<b>{title}</b>"
-                f"<ul style='margin:4px 0 0 16px; padding:0; "
-                f"font-size:12px;'>{body}</ul>"
-                f"</div>"
-            )
-
-        html = (
-            "<div style='display:flex; gap:24px; flex-wrap:wrap; "
-            "font-family:sans-serif;'>"
-            + _block(
-                f"Top {len(top_shared)} shared",
-                top_shared,
-                "no shared n-grams",
-            )
-            + _block(
-                f"Top {len(top_only_1)} only in Model 1",
-                top_only_1,
-                "none unique to Model 1",
-            )
-            + _block(
-                f"Top {len(top_only_2)} only in Model 2",
-                top_only_2,
-                "none unique to Model 2",
-            )
+        # Bold numbers, plain prose. No n-gram tokens listed — the user only
+        # needs the cardinalities for context; the headline behavioral
+        # number below already conveys "how similar" at the active metric.
+        lines = [
+            (
+                f"<b>n = {n}</b>: Model 1 produced "
+                f"<b>{counts['total_1']}</b> distinct n-gram"
+                f"{'s' if counts['total_1'] != 1 else ''}; "
+                f"Model 2 produced <b>{counts['total_2']}</b>."
+                f"{stale_suffix}"
+            ),
+            (
+                f"<b>{counts['shared']}</b> shared "
+                f"(<b>{counts['overlap_pct']:.1%}</b> of the union of "
+                f"<b>{counts['union']}</b>)."
+            ),
+            (
+                f"<b>{counts['only_1']}</b> unique to Model 1, "
+                f"<b>{counts['only_2']}</b> unique to Model 2."
+            ),
+        ]
+        self.ngram_top_html.value = (
+            "<div style='font-family:sans-serif; font-size:12px; "
+            "line-height:1.6;'>"
+            + "<br>".join(lines)
             + "</div>"
         )
-        # Atomic value replacement — no clear_output race.
-        self.ngram_top_html.value = html
-
-    def _placeholder_png(self, text):
-        """Tiny matplotlib figure with centered text, returned as PNG bytes.
-
-        Used for the "no traces yet" state of the n-gram chart so the
-        placeholder occupies the same Image widget as the real chart and we
-        never have to swap widget types.
-        """
-        fig, ax = plt.subplots(figsize=(8, 2))
-        ax.text(
-            0.5, 0.5, text,
-            ha="center", va="center", fontsize=11, color="#7f8c8d",
-            transform=ax.transAxes,
-        )
-        ax.set_axis_off()
-        fig.tight_layout()
-        import io
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
-        plt.close(fig)
-        return buf.getvalue()
 
     # ----- Hybrid section -----
 
@@ -1466,7 +1348,6 @@ class BPMNSimilarityDashboard:
                 self.behavioral_html,
                 widgets.HTML("<b>N-gram comparison:</b>"),
                 self.ngram_n_slider,
-                self.ngram_chart_image,
                 self.ngram_top_html,
                 # Headline behavioral score lives here — under the chart
                 # and tables that explain it. _render_behavioral writes
