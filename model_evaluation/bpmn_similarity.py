@@ -125,20 +125,23 @@ def calculate_ngram_similarity(
     Returns:
         Similarity score between 0.0 and 1.0.
     """
-    set_1 = list(set(extract_ngrams(traces_1, n=n, pad=pad)))
-    set_2 = list(set(extract_ngrams(traces_2, n=n, pad=pad)))
+    # The *_list / scores helpers each call `set(...)` on their inputs
+    # internally (see utils/list_similarity.py), so passing the raw n-gram
+    # list is enough — no need to dedupe here.
+    ngrams_1 = extract_ngrams(traces_1, n=n, pad=pad)
+    ngrams_2 = extract_ngrams(traces_2, n=n, pad=pad)
 
     if method == "jaccard":
-        score, _ = jaccard_list(set_1, set_2)
+        score, _ = jaccard_list(ngrams_1, ngrams_2)
         return score
     elif method == "dice":
-        score, _ = dice_list(set_1, set_2)
+        score, _ = dice_list(ngrams_1, ngrams_2)
         return score
     elif method == "overlap":
-        score, _ = overlap_list(set_1, set_2)
+        score, _ = overlap_list(ngrams_1, ngrams_2)
         return score
     elif method in {"precision", "recall", "f1"}:
-        score, _ = scores(set_1, set_2, score_type=method)
+        score, _ = scores(ngrams_1, ngrams_2, score_type=method)
         return score
     else:
         raise ValueError(f"Unknown similarity method: {method}")
