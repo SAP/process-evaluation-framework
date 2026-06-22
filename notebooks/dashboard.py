@@ -364,7 +364,12 @@ def _bpmn_options(EXAMPLES_DIR):
     _keys = list(bpmn_options.keys())
     default_1 = _preferred_1 if _preferred_1 in bpmn_options else (_keys[0] if _keys else None)
     default_2 = _preferred_2 if _preferred_2 in bpmn_options else (_keys[1] if len(_keys) > 1 else default_1)
-    return bpmn_options, default_1, default_2
+    # Flag for the downstream cards: when the user only has one .bpmn file
+    # in examples/, both dropdowns default to it. We surface a banner
+    # instead of silently comparing a model with itself (which yields a
+    # misleading 100% similarity).
+    only_one_file = len(_keys) < 2
+    return bpmn_options, default_1, default_2, only_one_file
 
 
 @app.cell
@@ -385,14 +390,31 @@ def _model_pickers(bpmn_options, default_1, default_2, mo):
 
 
 @app.cell
-def _models_card(card, mo, model1_dd, model2_dd):
+def _models_card(card, mo, model1_dd, model2_dd, only_one_file):
     # Lay the two dropdowns side-by-side (equal-width columns, small gap)
     # so they each span half the card with a touch of breathing room on
     # the outer edges. ``full_width=True`` on the dropdowns themselves
     # makes them stretch to fill their column.
+    #
+    # When the user only has one .bpmn file in examples/, prepend a warning
+    # banner so they don't mistake the resulting self-comparison for a real
+    # result. The downstream ``_load_models`` cell also refuses to proceed
+    # when both dropdowns point at the same file.
+    _body = [mo.hstack([model1_dd, model2_dd], widths="equal", gap=1)]
+    if only_one_file:
+        _body.insert(
+            0,
+            mo.Html(
+                "<div class='pe-stale'>"
+                "Only one BPMN file found in <code>examples/</code> — "
+                "add a second file (or pick different ones below) to "
+                "compare two distinct models."
+                "</div>"
+            ),
+        )
     card(
         "Models",
-        mo.hstack([model1_dd, model2_dd], widths="equal", gap=1),
+        mo.vstack(_body, gap=0.8),
         info=(
             "Pick the two BPMN files to compare. Changing either model "
             "re-runs every section below."
@@ -407,9 +429,19 @@ def _load_models(XMLBPMNConverter, mo, model1_dd, model2_dd):
     #
     # Reactivity: re-runs whenever either dropdown changes. The XML strings
     # are kept around for the BPMN preview iframes below.
+    #
+    # Stop conditions:
+    #  - either dropdown empty (initial render before defaults resolve, or
+    #    no .bpmn files in examples/);
+    #  - both dropdowns pointing at the same file (would silently produce a
+    #    100%-identical "comparison").
     mo.stop(
         not (model1_dd.value and model2_dd.value),
         mo.md("_Pick two BPMN files above to load the models._"),
+    )
+    mo.stop(
+        model1_dd.value == model2_dd.value,
+        mo.md("_Pick two **different** BPMN files to compare._"),
     )
 
     from pathlib import Path as _Path
@@ -592,28 +624,42 @@ def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_ht
 
 
 @app.cell
-def _structural_compute(
-    calculate_bpmn_similarity,
+def _normalize(
     cosine_sim_optimized,
-    metric_radio,
     model_1_json,
     model_2_json,
     normalize_atomic_names,
     threshold_slider,
 ):
-    # Pure-reactive normalization + structural similarity. Recomputes on
-    # threshold or metric change. For example-sized models this is fast enough
-    # to run live; gate behind a run_button if dogfood says otherwise.
+    # Semantic name alignment of Model 2 against Model 1's vocabulary. Lives
+    # in its own cell so the Global Controls card's normalization-summary
+    # panel can repaint as soon as alignment is done — without waiting on the
+    # downstream structural / behavioral pipelines that also consume the
+    # aligned model. Re-runs only on (model, threshold) change.
     m2_aligned, name_mappings = normalize_atomic_names(
         model_1_json,
         model_2_json,
         cosine_sim_optimized,
         threshold=threshold_slider.value,
     )
+    return m2_aligned, name_mappings
+
+
+@app.cell
+def _structural_compute(
+    calculate_bpmn_similarity,
+    m2_aligned,
+    metric_radio,
+    model_1_json,
+):
+    # Structural similarity over the already-aligned Model 2. Reactive on
+    # metric and (transitively, via ``m2_aligned``) threshold + models.
+    # For example-sized models this is fast enough to run live; gate behind
+    # a run_button if dogfood says otherwise.
     struct_result = calculate_bpmn_similarity(
         model_1_json, m2_aligned, method=metric_radio.value
     )
-    return m2_aligned, name_mappings, struct_result
+    return (struct_result,)
 
 
 @app.cell
@@ -648,15 +694,6 @@ def _structural_weight_state(mo, struct_result):
     weight_live = {
         k: (_hls.get(k) is not None) and (k != "subprocess" or _has_sub)
         for k in ("elements", "flows", "organizational", "subprocess")
-    }
-
-    # Canonical default percentages. With no subprocess, these sum to 80 —
-    # the rescaler will normalize that to 100 for the reset case.
-    weight_defaults = {
-        "elements": 35,
-        "flows": 25,
-        "organizational": 20,
-        "subprocess": 20 if _has_sub else 0,
     }
 
     def rescale_to_100(weights, live, pin=None):
@@ -733,7 +770,6 @@ def _structural_weight_state(mo, struct_result):
         get_weights,
         rescale_to_100,
         set_weights,
-        weight_defaults,
         weight_initial,
         weight_live,
     )
@@ -1290,62 +1326,31 @@ def _behavioral_scores(
 
 
 @app.cell
-def _ngram_counts(extract_ngrams, ngram_n, tr1, tr2):
-    # Mirrors ``_compute_ngram_counts`` in the original dashboard.
-    # All locals are underscore-prefixed so marimo treats them as
-    # cell-private — ``_behavioral_set_counts`` re-uses the names
-    # ``only_1`` / ``shared`` / ``only_2`` / ``union`` at top level and
-    # marimo would otherwise complain about a multi-cell definition.
-    _n = ngram_n.value
-    _ngrams_1 = set(extract_ngrams(tr1, n=_n, pad=True))
-    _ngrams_2 = set(extract_ngrams(tr2, n=_n, pad=True))
-    _shared = len(_ngrams_1 & _ngrams_2)
-    _only_1 = len(_ngrams_1 - _ngrams_2)
-    _only_2 = len(_ngrams_2 - _ngrams_1)
-    _union = _shared + _only_1 + _only_2
-    _overlap_pct = (_shared / _union) if _union else 0.0
-    ngram_counts = {
-        "n": _n,
-        "total_1": len(_ngrams_1),
-        "total_2": len(_ngrams_2),
-        "shared": _shared,
-        "only_1": _only_1,
-        "only_2": _only_2,
-        "union": _union,
-        "overlap_pct": _overlap_pct,
-    }
-    return (ngram_counts,)
-
-
-@app.cell
-def _behavioral_set_counts(behavioral_kind, ngram_counts, ngram_n, tr1, tr2):
-    # Single source of truth for the only_1 / shared / only_2 / union
-    # numbers consumed by both the chip block (diagnostics) and the
-    # set-overlap chart. In n-gram mode we already have these on the
-    # ``ngram_counts`` dict; in full-trace mode we compute them from the
-    # raw trace sets — same arithmetic the diagnostics block used to do
-    # inline for its "Traces matched exactly" line.
+def _behavioral_set_counts(behavioral_kind, extract_ngrams, ngram_n, tr1, tr2):
+    # Single source of truth for the only_1 / shared / only_2 / union numbers
+    # consumed by both the diagnostics block and the set-overlap chart. Owns
+    # the arithmetic for both kinds — n-gram sets come from
+    # ``extract_ngrams`` (with padding to match the headline similarity
+    # score), trace sets from ``all_traces``.
     if behavioral_kind.value == "N-gram":
-        set_counts = {
-            "only_1": ngram_counts["only_1"],
-            "shared": ngram_counts["shared"],
-            "only_2": ngram_counts["only_2"],
-            "union": ngram_counts["union"],
-            "unit": f"{ngram_n.value}-grams",
-        }
+        _n = ngram_n.value
+        _set_1 = set(extract_ngrams(tr1, n=_n, pad=True))
+        _set_2 = set(extract_ngrams(tr2, n=_n, pad=True))
+        _unit = f"{_n}-grams"
     else:
         _set_1 = {tuple(t) for t in tr1.all_traces()}
         _set_2 = {tuple(t) for t in tr2.all_traces()}
-        _shared = len(_set_1 & _set_2)
-        _only_1 = len(_set_1 - _set_2)
-        _only_2 = len(_set_2 - _set_1)
-        set_counts = {
-            "only_1": _only_1,
-            "shared": _shared,
-            "only_2": _only_2,
-            "union": _shared + _only_1 + _only_2,
-            "unit": "trace variants",
-        }
+        _unit = "trace variants"
+    _shared = len(_set_1 & _set_2)
+    _only_1 = len(_set_1 - _set_2)
+    _only_2 = len(_set_2 - _set_1)
+    set_counts = {
+        "only_1": _only_1,
+        "shared": _shared,
+        "only_2": _only_2,
+        "union": _shared + _only_1 + _only_2,
+        "unit": _unit,
+    }
     return (set_counts,)
 
 
@@ -1357,7 +1362,7 @@ def _fig_behavioral_overlap(go, mo, set_counts):
     # structural charts (title pinned to container top, h-orient legend
     # just below) so the two sections look like one family.
     # Locals are underscore-prefixed so marimo doesn't promote them to
-    # global names that conflict with ``_ngram_counts``.
+    # global names that conflict with ``_behavioral_set_counts``.
     _only_1 = set_counts["only_1"]
     _shared = set_counts["shared"]
     _only_2 = set_counts["only_2"]
@@ -1482,17 +1487,12 @@ def _behavioral_diagnostics(behavioral_kind, metric_radio, ngram_n, tr1, tr2):
         "</div>"
     )
 
-    # Reactive trace extraction means the diagnostics block is always
-    # current — kept here as a constant so downstream cells (hybrid card)
-    # don't have to special-case its absence.
-    is_stale = False
-
     # Headline score label honors the kind + n + metric.
     if behavioral_kind.value == "N-gram":
         score_label = f"n-gram, n={ngram_n.value}, {metric_radio.value}"
     else:
         score_label = metric_radio.value
-    return diagnostics_html, is_stale, score_label
+    return diagnostics_html, score_label
 
 
 @app.cell
@@ -1618,24 +1618,17 @@ def _hybrid_card(
     fmt_pct,
     hybrid,
     hybrid_weight,
-    is_stale,
     mo,
 ):
-    behavioral_stale = is_stale and hybrid["behavioral"] is not None
-    structural_stale_note = ""  # threshold drives both reactively, never stale here
-    behavioral_stale_note = (
-        " <span style='color:#b45309;'>⚠ behavioral is stale</span>"
-        if behavioral_stale
-        else ""
-    )
-
+    # Threshold drives both structural and behavioral reactively, so neither
+    # side can be stale relative to the other — no banner needed.
     structural_line = (
         f"<div class='pe-muted'>Structural: <b>{fmt_pct(hybrid['structural'])}</b> "
-        f"× {hybrid['structural_weight']:.0%}{structural_stale_note}</div>"
+        f"× {hybrid['structural_weight']:.0%}</div>"
     )
     behavioral_line = (
         f"<div class='pe-muted'>Behavioral: <b>{fmt_pct(hybrid['behavioral'])}</b> "
-        f"× {hybrid['behavioral_weight']:.0%}{behavioral_stale_note}</div>"
+        f"× {hybrid['behavioral_weight']:.0%}</div>"
     )
 
     # Hero footer block — same styling as the structural and behavioral cards
