@@ -431,14 +431,91 @@ def _structural_compute(
 @app.cell
 def _structural_weight_state(mo, struct_result):
     # Shared state for the four weight sliders, keyed by category. Sliders
-    # both read from and write to this state, which lets the "Normalize"
-    # button rewrite all four values in one go and have the sliders re-render
-    # at the new positions.
+    # both read from and write to this state, which lets external updates
+    # (the Reset button, the auto-normalize on_change) rewrite all four
+    # values in one go and have the sliders re-render at the new positions.
     _weights_used = struct_result.get("weights_used", {})
     _has_sub = struct_result.get("has_expanded_subprocess", False)
 
     def _init(key, default_pct):
         return int(round(_weights_used.get(key, default_pct / 100) * 100))
+
+    # Which categories are "live" — have a score in at least one model and,
+    # for subprocess, an actually-expanded subprocess. Dead categories must
+    # stay at 0 and not participate in normalization.
+    _hls = struct_result["high_level_scores"]
+    weight_live = {
+        k: (_hls.get(k) is not None) and (k != "subprocess" or _has_sub)
+        for k in ("elements", "flows", "organizational", "subprocess")
+    }
+
+    # Canonical default percentages. With no subprocess, these sum to 80 —
+    # the rescaler will normalize that to 100 for the reset case.
+    weight_defaults = {
+        "elements": 35,
+        "flows": 25,
+        "organizational": 20,
+        "subprocess": 20 if _has_sub else 0,
+    }
+
+    def rescale_to_100(weights, live, pin=None):
+        """Rescale live categories so they sum to exactly 100.
+
+        - Dead categories are forced to 0.
+        - ``pin`` is an optional ``(key, value)`` for the slider the user
+          just moved: that value is held fixed (clamped to [0, 100]) and
+          the remaining ``100 - value`` is distributed across the *other*
+          live categories proportionally to their current shares. If those
+          others currently sum to 0, distribute equally.
+        - Without ``pin``, all live categories share 100 proportionally to
+          their current values; if they all happen to be 0, split evenly.
+        - Uses largest-remainder rounding so the four returned integers
+          sum to exactly 100 (avoids 33+33+33 = 99 artefacts).
+        """
+        keys = list(weights.keys())
+        live_keys = [k for k in keys if live[k]]
+        if not live_keys:
+            return {k: 0 for k in keys}
+
+        if pin is not None:
+            pin_key, pin_val = pin
+            pin_val = max(0, min(100, int(pin_val)))
+            if pin_key not in live_keys:
+                # Pinning a dead key shouldn't happen, but degrade gracefully.
+                return rescale_to_100(weights, live)
+            others = [k for k in live_keys if k != pin_key]
+            if not others:
+                # Only one live category — it gets whatever the user picked.
+                return {k: (pin_val if k == pin_key else 0) for k in keys}
+            remaining = 100 - pin_val
+            other_sum = sum(weights[k] for k in others)
+            if other_sum > 0:
+                raw_others = {
+                    k: (weights[k] / other_sum) * remaining for k in others
+                }
+            else:
+                share = remaining / len(others)
+                raw_others = {k: share for k in others}
+            raw = {pin_key: float(pin_val)}
+            raw.update(raw_others)
+        else:
+            live_sum = sum(weights[k] for k in live_keys)
+            if live_sum > 0:
+                raw = {k: (weights[k] / live_sum) * 100 for k in live_keys}
+            else:
+                share = 100 / len(live_keys)
+                raw = {k: share for k in live_keys}
+
+        # Largest-remainder rounding across the live keys only.
+        floors = {k: int(raw[k]) for k in live_keys}
+        remainder = 100 - sum(floors.values())
+        order = sorted(
+            live_keys, key=lambda k: raw[k] - floors[k], reverse=True
+        )
+        for k in order[: max(0, remainder)]:
+            floors[k] += 1
+
+        return {k: floors.get(k, 0) for k in keys}
 
     get_weights, set_weights = mo.state(
         {
@@ -446,25 +523,53 @@ def _structural_weight_state(mo, struct_result):
             "flows": _init("flows", 25),
             "organizational": _init("organizational", 20),
             "subprocess": _init("subprocess", 20) if _has_sub else 0,
-        }
+        },
+        # The slider on_change handlers live in the same cell that reads
+        # get_weights() to build the sliders. Without this, marimo blocks
+        # the cell from re-running in response to its own set_weights() call
+        # and the *other* sliders stay frozen at their old positions while
+        # state is silently updated. Allowing the self-loop lets the cell
+        # rebuild every slider at the rescaled value, so the proportional
+        # auto-normalization is actually visible.
+        allow_self_loops=True,
     )
-    return get_weights, set_weights
+    return (
+        get_weights,
+        rescale_to_100,
+        set_weights,
+        weight_defaults,
+        weight_live,
+    )
 
 
 @app.cell
-def _structural_weight_sliders(get_weights, mo, set_weights, struct_result):
+def _structural_weight_sliders(
+    get_weights,
+    mo,
+    rescale_to_100,
+    set_weights,
+    struct_result,
+    weight_live,
+):
     # One slider per high-level category, in percent. Values come from the
-    # shared state cell above; an on_change handler writes the new value back
-    # so external updates (the Normalize button) and direct user drags both
-    # converge on the same source of truth. Disabled when the corresponding
-    # score is None (no data in either model on that axis).
+    # shared state cell above; an on_change handler rescales the other live
+    # sliders proportionally so the live-categories sum stays at exactly 100
+    # at every tick — no manual "normalize" step needed. Disabled when the
+    # corresponding score is None (no data in either model on that axis).
     hls = struct_result["high_level_scores"]
     has_subprocess = struct_result.get("has_expanded_subprocess", False)
     _w = get_weights()
 
     def _make(key, label, disabled, stop=100):
         def _on_change(v, _k=key):
-            set_weights(lambda s: {**s, _k: v})
+            # Pin the moved slider to v and redistribute the rest across
+            # the other live categories. set_weights uses a lambda so we
+            # rescale against the latest state, not a stale snapshot.
+            set_weights(
+                lambda s, _k=_k, _v=v: rescale_to_100(
+                    s, weight_live, pin=(_k, _v)
+                )
+            )
 
         return mo.ui.slider(
             start=0,
@@ -490,65 +595,22 @@ def _structural_weight_sliders(get_weights, mo, set_weights, struct_result):
 
 
 @app.cell
-def _structural_weight_controls(get_weights, mo, set_weights, struct_result):
-    # "Normalize to 100%" button + a live sum indicator. Mirrors the
-    # ``_normalize_weights`` semantics from
-    # ``model_evaluation/rendering/dashboard.py:406-439``: zero out non-live
-    # categories, divide each remaining value by the live total, scale to
-    # percent. Uses largest-remainder rounding so the displayed integers sum
-    # to exactly 100 (avoids 33+33+33 = 99 artefacts).
-    _hls = struct_result["high_level_scores"]
-    _has_sub = struct_result.get("has_expanded_subprocess", False)
-    _live = {
-        k: (_hls.get(k) is not None) and (k != "subprocess" or _has_sub)
-        for k in ("elements", "flows", "organizational", "subprocess")
-    }
-    _defaults = {
-        "elements": 35,
-        "flows": 25,
-        "organizational": 20,
-        "subprocess": 20 if _has_sub else 0,
-    }
+def _structural_weight_controls(
+    mo,
+    rescale_to_100,
+    set_weights,
+    weight_defaults,
+    weight_live,
+):
+    # Reset button — restores the canonical default percentages
+    # (35 / 25 / 20 / 20), rescaling through ``rescale_to_100`` so the live
+    # categories sum to exactly 100 even when subprocess is absent and the
+    # raw defaults only add up to 80.
+    def _reset(_event):
+        set_weights(rescale_to_100(weight_defaults, weight_live))
 
-    def _normalize(_event):
-        s = get_weights()
-        zeroed = {k: (s[k] if _live[k] else 0) for k in s}
-        total = sum(zeroed.values())
-        if total == 0:
-            new = {k: (_defaults[k] if _live[k] else 0) for k in s}
-            # Re-normalize defaults too, in case live keys' defaults don't
-            # already sum to 100 (e.g. no-subprocess case sums to 80).
-            d_total = sum(new.values())
-            if d_total and d_total != 100:
-                raw = {k: (new[k] / d_total) * 100 for k in s}
-            else:
-                set_weights(new)
-                return
-        else:
-            raw = {k: (zeroed[k] / total) * 100 for k in s}
-
-        floors = {k: int(raw[k]) for k in s}
-        remainder = 100 - sum(floors.values())
-        # Distribute the rounding remainder to the categories with the
-        # largest fractional parts; ties broken by dict iteration order.
-        order = sorted(s, key=lambda k: raw[k] - floors[k], reverse=True)
-        for k in order[:max(0, remainder)]:
-            floors[k] += 1
-        set_weights(floors)
-
-    normalize_button = mo.ui.button(label="Normalize to 100%", on_click=_normalize)
-
-    _w = get_weights()
-    _live_sum = sum(_w[k] for k in _w if _live[k])
-    if _live_sum == 100:
-        _msg = f"Sum (live categories): **{_live_sum}%** — normalized"
-    else:
-        _msg = (
-            f"Sum (live categories): **{_live_sum}%** — "
-            "click Normalize to rescale to 100%"
-        )
-    sum_indicator = mo.md(_msg)
-    return normalize_button, sum_indicator
+    reset_button = mo.ui.button(label="Reset to default values", on_click=_reset)
+    return (reset_button,)
 
 
 @app.cell
@@ -828,38 +890,67 @@ def _structural_card(
     fig_weighted,
     flows_w,
     fmt_pct,
-    kpi_html,
     mo,
-    normalize_button,
     org_w,
     overall,
+    reset_button,
     subprocess_w,
-    sum_indicator,
 ):
     # Two rows of two sliders each — at four-up the slider track and the
     # right-hand value label fight for a column that's too narrow once the
     # card padding is taken out, so the value clips. 2×2 lets each slider
     # have ~50% of the card width and reflow as the page resizes. A third
-    # row holds the live sum indicator and the Normalize button.
+    # row holds the Reset button, right-aligned.
     weights_row = mo.vstack(
         [
             mo.hstack([elements_w, flows_w], widths="equal", gap=2),
             mo.hstack([org_w, subprocess_w], widths="equal", gap=2),
-            mo.hstack(
-                [sum_indicator, normalize_button],
-                justify="space-between",
-                gap=2,
-            ),
+            mo.hstack([reset_button], justify="end", gap=2),
         ],
         gap=1,
     )
-    _s_headline = mo.Html(kpi_html("Structural overall", fmt_pct(overall), "#2c3e50"))
-    charts = mo.hstack([fig_weighted, fig_breakdown], widths="equal", gap=2)
+    # Charts read left-to-right as inputs → result: the per-element breakdown
+    # on the left, the weighted contributions that compose it into the overall
+    # score on the right.
+    charts = mo.hstack([fig_breakdown, fig_weighted], widths="equal", gap=2)
     # Extra breathing room between the slider/button row and the charts —
     # the third weights_row line otherwise sits visually flush against the
     # chart titles.
     _spacer = mo.Html("<div style='height:14px'></div>")
-    card("Structural similarity", weights_row, _spacer, charts, _s_headline)
+    # Hero footer block: the card's headline number sits in a tinted band
+    # below the charts so it reads as a real summary, not a stat squeezed
+    # into the title. Flex layout keeps the label on the left and the big
+    # percentage hugging the right edge regardless of card width.
+    _hero_html = (
+        "<div style='"
+        "margin-top:18px;"
+        "background:#eef2ff;"
+        "border:1px solid #c7d2fe;"
+        "border-radius:12px;"
+        "padding:16px 24px;"
+        "display:flex;"
+        "align-items:center;"
+        "justify-content:space-between;"
+        "gap:24px;"
+        "'>"
+        "<div style='"
+        "color:#475569;"
+        "font-size:13px;"
+        "font-weight:600;"
+        "text-transform:uppercase;"
+        "letter-spacing:0.06em;"
+        "'>Structural overall</div>"
+        "<div style='"
+        "color:#1e293b;"
+        "font-size:32px;"
+        "font-weight:700;"
+        "line-height:1;"
+        "font-variant-numeric:tabular-nums;"
+        f"'>{fmt_pct(overall)}</div>"
+        "</div>"
+    )
+    _hero = mo.Html(_hero_html)
+    card("Structural similarity", weights_row, _spacer, charts, _hero)
     return
 
 
@@ -962,7 +1053,7 @@ def _ngram_counts(extract_ngrams, ngram_n, tr1, tr2):
 
 
 @app.cell
-def _behavioral_set_counts(behavioral_kind, ngram_counts, tr1, tr2):
+def _behavioral_set_counts(behavioral_kind, ngram_counts, ngram_n, tr1, tr2):
     # Single source of truth for the only_1 / shared / only_2 / union
     # numbers consumed by both the chip block (diagnostics) and the
     # set-overlap chart. In n-gram mode we already have these on the
@@ -975,7 +1066,7 @@ def _behavioral_set_counts(behavioral_kind, ngram_counts, tr1, tr2):
             "shared": ngram_counts["shared"],
             "only_2": ngram_counts["only_2"],
             "union": ngram_counts["union"],
-            "unit": "n-grams",
+            "unit": f"{ngram_n.value}-grams",
         }
     else:
         _set_1 = {tuple(t) for t in tr1.all_traces()}
@@ -1134,24 +1225,64 @@ def _behavioral_card(
     diagnostics_html,
     fig_behavioral,
     fmt_pct,
-    kpi_html,
     mo,
     ngram_n,
-    score_label,
 ):
-    _b_headline = mo.Html(
-        kpi_html(
-            f"Behavioral ({score_label})",
-            fmt_pct(active_score),
-            "#2c3e50",
-        )
+    # Subtitle shows only the *kind* of behavioral comparison (Full Trace or
+    # N-gram with its n) — not the distance metric, which lives in the
+    # diagnostics block above.
+    if behavioral_kind.value == "N-gram":
+        _b_subtitle = f"N-gram (n={ngram_n.value})"
+    else:
+        _b_subtitle = behavioral_kind.value
+
+    # Hero footer block — mirrors the structural card so all three section
+    # summaries share the same tinted band, label/value layout, and sizing.
+    # Two-line label: "Behavioral overall" on top, the active scorer kind
+    # as a lighter subtitle.
+    _b_hero_html = (
+        "<div style='"
+        "margin-top:18px;"
+        "background:#eef2ff;"
+        "border:1px solid #c7d2fe;"
+        "border-radius:12px;"
+        "padding:16px 24px;"
+        "display:flex;"
+        "align-items:center;"
+        "justify-content:space-between;"
+        "gap:24px;"
+        "'>"
+        "<div>"
+        "<div style='"
+        "color:#475569;"
+        "font-size:13px;"
+        "font-weight:600;"
+        "text-transform:uppercase;"
+        "letter-spacing:0.06em;"
+        "'>Behavioral overall</div>"
+        "<div style='"
+        "color:#64748b;"
+        "font-size:12px;"
+        "font-weight:400;"
+        "margin-top:4px;"
+        f"'>{_b_subtitle}</div>"
+        "</div>"
+        "<div style='"
+        "color:#1e293b;"
+        "font-size:32px;"
+        "font-weight:700;"
+        "line-height:1;"
+        "font-variant-numeric:tabular-nums;"
+        f"'>{fmt_pct(active_score)}</div>"
+        "</div>"
     )
+    _b_hero = mo.Html(_b_hero_html)
     card(
         "Behavioral similarity",
         mo.hstack([behavioral_kind, ngram_n], widths="equal", gap=2),
         mo.Html(diagnostics_html),
         fig_behavioral,
-        _b_headline,
+        _b_hero,
     )
     return
 
@@ -1186,16 +1317,12 @@ def _hybrid_compute(
 
 @app.cell
 def _hybrid_card(
-    behavioral_kind,
     card,
     fmt_pct,
     hybrid,
     hybrid_weight,
     is_stale,
-    kpi_html,
-    metric_radio,
     mo,
-    ngram_n,
 ):
     behavioral_stale = is_stale and hybrid["behavioral"] is not None
     structural_stale_note = ""  # threshold drives both reactively, never stale here
@@ -1214,27 +1341,44 @@ def _hybrid_card(
         f"× {hybrid['behavioral_weight']:.0%}{behavioral_stale_note}</div>"
     )
 
-    if hybrid["hybrid"] is None:
-        kpi_label = "Hybrid (no data)"
-    elif hybrid["structural"] is None:
-        kpi_label = "Hybrid (behavioral only)"
-    elif hybrid["behavioral"] is None:
-        kpi_label = "Hybrid (structural only)"
-    else:
-        if behavioral_kind.value == "N-gram":
-            kpi_label = (
-                f"Hybrid (n-gram n={ngram_n.value}, {metric_radio.value})"
-            )
-        else:
-            kpi_label = f"Hybrid ({metric_radio.value})"
-
-    _h_headline = mo.Html(kpi_html(kpi_label, fmt_pct(hybrid["hybrid"]), "#0f172a"))
+    # Hero footer block — same styling as the structural and behavioral cards
+    # so all three summaries share the same visual weight. Single-line label;
+    # the diagnostic lines above already spell out which components feed in.
+    _h_hero_html = (
+        "<div style='"
+        "margin-top:18px;"
+        "background:#eef2ff;"
+        "border:1px solid #c7d2fe;"
+        "border-radius:12px;"
+        "padding:16px 24px;"
+        "display:flex;"
+        "align-items:center;"
+        "justify-content:space-between;"
+        "gap:24px;"
+        "'>"
+        "<div style='"
+        "color:#475569;"
+        "font-size:13px;"
+        "font-weight:600;"
+        "text-transform:uppercase;"
+        "letter-spacing:0.06em;"
+        "'>Hybrid overall</div>"
+        "<div style='"
+        "color:#1e293b;"
+        "font-size:32px;"
+        "font-weight:700;"
+        "line-height:1;"
+        "font-variant-numeric:tabular-nums;"
+        f"'>{fmt_pct(hybrid['hybrid'])}</div>"
+        "</div>"
+    )
+    _h_hero = mo.Html(_h_hero_html)
     card(
         "Hybrid similarity",
         hybrid_weight,
         mo.Html(structural_line),
         mo.Html(behavioral_line),
-        _h_headline,
+        _h_hero,
     )
     return
 
