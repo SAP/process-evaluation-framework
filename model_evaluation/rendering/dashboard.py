@@ -45,7 +45,7 @@ Usage in a notebook::
 """
 
 import ipywidgets as widgets
-from IPython.display import display, clear_output, HTML
+from IPython.display import display, clear_output
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
@@ -104,6 +104,7 @@ class BPMNSimilarityDashboard:
         initial_trace_timeout=5.0,
         initial_max_loop_depth=3,
         initial_structural_weight=0.5,
+        initial_ngram_n=2,
     ):
         """
         Args:
@@ -131,6 +132,10 @@ class BPMNSimilarityDashboard:
                 (default 3).
             initial_structural_weight: Initial weight for the structural side
                 of the hybrid score, in [0, 1] (default 0.5 — equal weighting).
+            initial_ngram_n: Initial n for the n-gram comparison subpanel
+                (default 2 — bigrams). The slider in the Behavioral section
+                exposes n=1..5; changing it only re-runs the (cheap) n-gram
+                math, never the (expensive) trace extraction.
         """
         self.model_1 = model_1
         self.model_2 = model_2
@@ -151,6 +156,7 @@ class BPMNSimilarityDashboard:
         self.current_threshold = initial_threshold
         self.current_trace_timeout = initial_trace_timeout
         self.current_max_loop_depth = initial_max_loop_depth
+        self.current_ngram_n = initial_ngram_n
 
         # Threshold used for the cached initial normalization (so we know when
         # the user has dragged the slider to a different value and we need to
@@ -165,9 +171,16 @@ class BPMNSimilarityDashboard:
         self._last_trace_result_2 = None
         self._last_behavioral_score = None
         self._last_behavioral_metric = None
+        self._last_behavioral_ngram_score = None
+        self.current_behavioral_kind = "trace"
         # Triple identifying which (threshold, timeout, loop_depth) the last
         # extraction was performed against. Used to detect staleness.
         self._last_extraction_key = None
+
+        # N-gram subpanel state. Filled by _compute_and_cache_ngram_artifacts.
+        self._last_ngram_metrics = None
+        self._last_ngram_counts = None
+        self._last_ngram_n = None
 
         # Hybrid weight slider initial value, used by _create_widgets.
         self._initial_structural_weight = initial_structural_weight
@@ -226,7 +239,7 @@ class BPMNSimilarityDashboard:
 
     def _create_widgets(self):
         """Create all interactive widgets."""
-        self.output = widgets.Output()
+        self.chart_image = widgets.Image(format="png")
         self.message_output = widgets.Output()
 
         # Weight sliders. "elements" is the activities + events + gateways
@@ -283,6 +296,7 @@ class BPMNSimilarityDashboard:
         self.metric_buttons = {
             "dice": widgets.Button(description="Dice", button_style="primary"),
             "jaccard": widgets.Button(description="Jaccard", button_style=""),
+            "overlap": widgets.Button(description="Overlap", button_style=""),
             "precision": widgets.Button(description="Precision", button_style=""),
             "recall": widgets.Button(description="Recall", button_style=""),
             "f1": widgets.Button(description="F1", button_style=""),
@@ -308,7 +322,13 @@ class BPMNSimilarityDashboard:
         # === Behavioral and hybrid widgets ===
         # Only created (and shown) when the behavioral hooks were provided.
         if self._behavioral_enabled:
-            self.behavioral_output = widgets.Output()
+            self.behavioral_html = widgets.HTML(value="")
+            # Headline behavioral score lives in its own widget so it can be
+            # placed at the bottom of the N-gram subpanel — visually adjacent
+            # to the chart and tables that explain the number — while the
+            # diagnostics block above (stale banner, soundness warnings,
+            # trace counts) stays near the Compute button.
+            self.behavioral_score_html = widgets.HTML(value="")
 
             self.trace_timeout_slider = widgets.FloatSlider(
                 value=self.current_trace_timeout,
@@ -336,8 +356,43 @@ class BPMNSimilarityDashboard:
             )
             self.compute_behavioral_button.on_click(self._on_compute_behavioral)
 
+            # Behavioral representation selector. Picks which trace
+            # representation drives the headline behavioral number (and
+            # therefore the hybrid score): full deduped traces or n-grams at
+            # the current n. Mirrors the metric_buttons pattern above — the
+            # set-comparison method (current_metric) is orthogonal and
+            # applies on top of whichever kind is active.
+            self.behavioral_kind_buttons = {
+                "trace": widgets.Button(
+                    description="Full Trace", button_style="primary"
+                ),
+                "ngram": widgets.Button(description="N-gram", button_style=""),
+            }
+            for kind, button in self.behavioral_kind_buttons.items():
+                button.on_click(lambda b, k=kind: self._set_behavioral_kind(k))
+
+            # N-gram subpanel widgets. Live inside the Behavioral section and
+            # share its extracted traces — see _on_compute_behavioral and
+            # _on_ngram_n_change. Same atomic-PNG-bytes pattern as the
+            # structural chart_image (line above) to avoid the VS Code
+            # output-stacking issue.
+            self.ngram_n_slider = widgets.IntSlider(
+                value=self.current_ngram_n,
+                min=1, max=5, step=1,
+                description="n-gram n:",
+                continuous_update=False,
+                style={'description_width': '140px'}
+            )
+            self.ngram_n_slider.observe(self._on_ngram_n_change, names="value")
+            # Single HTML widget renders the n-gram subpanel: a few lines of
+            # text reporting per-side / shared / unique counts. The headline
+            # behavioral score (one widget below this section) already shows
+            # the active metric's value, so we do NOT render a per-metric
+            # bar chart here.
+            self.ngram_top_html = widgets.HTML(value="")
+
             # Hybrid section.
-            self.hybrid_output = widgets.Output()
+            self.hybrid_output = widgets.HTML(value="")
             self.hybrid_weight_slider = widgets.FloatSlider(
                 value=self._initial_structural_weight,
                 min=0.0, max=1.0, step=0.05,
@@ -421,9 +476,30 @@ class BPMNSimilarityDashboard:
                 method=self.current_metric,
             )
             self._last_behavioral_metric = self.current_metric
+            self._compute_and_cache_ngram_artifacts()
             self._render_behavioral()
+            self._render_ngram_section()
+            self._render_hybrid()
 
         self._recalculate(None)
+
+    def _set_behavioral_kind(self, kind):
+        """Switch the headline behavioral representation (trace ↔ n-gram).
+
+        Both scores are kept in lock-step elsewhere (see
+        _compute_and_cache_ngram_artifacts and _set_metric), so this handler
+        is purely a re-render — no compute. Hybrid follows the active kind.
+        """
+        if kind == self.current_behavioral_kind:
+            return  # no-op; avoids a needless re-render flicker
+        self.current_behavioral_kind = kind
+
+        for name, button in self.behavioral_kind_buttons.items():
+            button.button_style = "primary" if name == kind else ""
+
+        if self._behavioral_enabled:
+            self._render_behavioral()
+            self._render_hybrid()
 
     def _on_threshold_change(self, change):
         """Handle threshold slider changes."""
@@ -439,6 +515,7 @@ class BPMNSimilarityDashboard:
         if self._behavioral_enabled:
             self._render_behavioral()
             self._render_hybrid()
+            self._render_ngram_section()
 
     def _recalculate(self, button):
         """Recalculate and update visualization."""
@@ -527,183 +604,189 @@ class BPMNSimilarityDashboard:
 
         data_presence = result.get("data_presence", {})
 
-        with self.output:
-            clear_output(wait=True)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        # === LEFT CHART: Weighted Category Scores ===
+        categories = ["Elements", "Flows", "Organizational", "Subprocess"]
+        keys = ["elements", "flows", "organizational", "subprocess"]
+        raw_scores_raw = [result["high_level_scores"][k] for k in keys]
+        present_flags = [s is not None for s in raw_scores_raw]
+        # Substitute 0 for None so multiplication below doesn't TypeError;
+        # those rows get overlaid with a gray "N/A" band so the user can
+        # see they were skipped (not scored at zero).
+        raw_scores = [s if p else 0 for s, p in zip(raw_scores_raw, present_flags)]
 
-            # === LEFT CHART: Weighted Category Scores ===
-            categories = ["Elements", "Flows", "Organizational", "Subprocess"]
-            keys = ["elements", "flows", "organizational", "subprocess"]
-            raw_scores_raw = [result["high_level_scores"][k] for k in keys]
-            present_flags = [s is not None for s in raw_scores_raw]
-            # Substitute 0 for None so multiplication below doesn't TypeError;
-            # those rows get overlaid with a gray "N/A" band so the user can
-            # see they were skipped (not scored at zero).
-            raw_scores = [s if p else 0 for s, p in zip(raw_scores_raw, present_flags)]
+        weights_vals = [elements, flows, organizational, subprocess]
+        # Weighted scores: 0 for None rows (won't be plotted anyway —
+        # gray band overlays them).
+        weighted_scores = [
+            s * w if p else 0
+            for s, w, p in zip(raw_scores, weights_vals, present_flags)
+        ]
 
-            weights_vals = [elements, flows, organizational, subprocess]
-            # Weighted scores: 0 for None rows (won't be plotted anyway —
-            # gray band overlays them).
-            weighted_scores = [
-                s * w if p else 0
-                for s, w, p in zip(raw_scores, weights_vals, present_flags)
-            ]
+        # Equal weights for comparison — split evenly across live
+        # categories (those whose high-level score is not None).
+        live_count = sum(present_flags)
+        equal_weight = 1.0 / live_count if live_count > 0 else 0
+        equal_weights_vals = [equal_weight if p else 0 for p in present_flags]
+        equal_weighted_scores = [
+            s * w for s, w in zip(raw_scores, equal_weights_vals)
+        ]
+        overall_equal = sum(equal_weighted_scores) if live_count > 0 else None
 
-            # Equal weights for comparison — split evenly across live
-            # categories (those whose high-level score is not None).
-            live_count = sum(present_flags)
-            equal_weight = 1.0 / live_count if live_count > 0 else 0
-            equal_weights_vals = [equal_weight if p else 0 for p in present_flags]
-            equal_weighted_scores = [
-                s * w for s, w in zip(raw_scores, equal_weights_vals)
-            ]
-            overall_equal = sum(equal_weighted_scores) if live_count > 0 else None
+        colors_current = "#2c3e50"   # near-black for current-weight bars
+        colors_equal = "#95a5a6"     # medium gray for equal-weight bars
+        y_pos = np.arange(len(categories))
+        bar_height = 0.35
 
-            colors_current = "#2c3e50"   # near-black for current-weight bars
-            colors_equal = "#95a5a6"     # medium gray for equal-weight bars
-            y_pos = np.arange(len(categories))
-            bar_height = 0.35
+        # Plot bars - grouped side by side, in gray (equal) and dark
+        # (current). Category color lives in the right chart; the left
+        # chart focuses on equal-vs-current weight contrast.
+        ax1.barh(y_pos + bar_height/2, equal_weighted_scores, color=colors_equal, alpha=0.5, height=bar_height)
+        ax1.barh(y_pos - bar_height/2, weighted_scores, color=colors_current, alpha=0.9, height=bar_height)
 
-            # Plot bars - grouped side by side, in gray (equal) and dark
-            # (current). Category color lives in the right chart; the left
-            # chart focuses on equal-vs-current weight contrast.
-            ax1.barh(y_pos + bar_height/2, equal_weighted_scores, color=colors_equal, alpha=0.5, height=bar_height)
-            ax1.barh(y_pos - bar_height/2, weighted_scores, color=colors_current, alpha=0.9, height=bar_height)
+        ax1.set_yticks(y_pos)
+        ax1.set_yticklabels(categories)
+        ax1.set_xlabel("Weighted Score (Score × Weight)")
+        xlim = max(0.5, max(weighted_scores + equal_weighted_scores) * 1.3)
+        ax1.set_xlim(0, xlim)
 
-            ax1.set_yticks(y_pos)
-            ax1.set_yticklabels(categories)
-            ax1.set_xlabel("Weighted Score (Score × Weight)")
-            xlim = max(0.5, max(weighted_scores + equal_weighted_scores) * 1.3)
-            ax1.set_xlim(0, xlim)
+        metric_display = self.current_metric.upper()
+        ax1.set_title(
+            f"Weighted Contributions | Metric: {metric_display} | Threshold: {self.current_threshold:.2f}",
+            fontsize=11
+        )
 
-            metric_display = self.current_metric.upper()
-            ax1.set_title(
-                f"Weighted Contributions | Metric: {metric_display} | Threshold: {self.current_threshold:.2f}",
-                fontsize=11
-            )
+        # Gray N/A overlay for None rows — same treatment as the right
+        # chart's "no data in either model" rows.
+        for i, present in enumerate(present_flags):
+            if not present:
+                ax1.barh(i, xlim, color=NO_DATA_COLOR, alpha=0.5, height=0.8)
+                ax1.text(xlim * 0.5, i, "N/A — no data in either model",
+                         va="center", ha="center", fontsize=9,
+                         color="gray", style="italic")
 
-            # Gray N/A overlay for None rows — same treatment as the right
-            # chart's "no data in either model" rows.
-            for i, present in enumerate(present_flags):
-                if not present:
-                    ax1.barh(i, xlim, color=NO_DATA_COLOR, alpha=0.5, height=0.8)
-                    ax1.text(xlim * 0.5, i, "N/A — no data in either model",
-                             va="center", ha="center", fontsize=9,
-                             color="gray", style="italic")
+        # Custom legend — colors match the bars exactly. Use "N/A" in
+        # parentheses if overall_equal / overall is None.
+        equal_label = (
+            f"Equal Weights ({overall_equal:.1%})" if overall_equal is not None
+            else "Equal Weights (N/A)"
+        )
+        current_label = (
+            f"Current Weights ({overall:.1%})" if overall is not None
+            else "Current Weights (N/A)"
+        )
+        legend_elements = [
+            mpatches.Patch(facecolor=colors_equal, alpha=0.5, label=equal_label),
+            mpatches.Patch(facecolor=colors_current, alpha=0.9, label=current_label),
+        ]
+        ax1.legend(handles=legend_elements, loc="best", fontsize=9)
+        ax1.grid(axis="x", alpha=0.3)
 
-            # Custom legend — colors match the bars exactly. Use "N/A" in
-            # parentheses if overall_equal / overall is None.
-            equal_label = (
-                f"Equal Weights ({overall_equal:.1%})" if overall_equal is not None
-                else "Equal Weights (N/A)"
-            )
-            current_label = (
-                f"Current Weights ({overall:.1%})" if overall is not None
-                else "Current Weights (N/A)"
-            )
-            legend_elements = [
-                mpatches.Patch(facecolor=colors_equal, alpha=0.5, label=equal_label),
-                mpatches.Patch(facecolor=colors_current, alpha=0.9, label=current_label),
-            ]
-            ax1.legend(handles=legend_elements, loc="best", fontsize=9)
-            ax1.grid(axis="x", alpha=0.3)
+        # Value labels at end of bars — only for present rows; None rows
+        # already carry an "N/A" label inside their gray band.
+        for i, (eq_score, cur_score, present) in enumerate(
+            zip(equal_weighted_scores, weighted_scores, present_flags)
+        ):
+            if not present:
+                continue
+            # if eq_score > 0.005:
+            ax1.text(eq_score + 0.01, i + bar_height/2, f"{eq_score:.2f}",
+                        va="center", fontsize=8, color="gray")
+            # if cur_score > 0.005:
+            ax1.text(cur_score + 0.01, i - bar_height/2, f"{cur_score:.2f}",
+                        va="center", fontsize=8, weight="bold")
 
-            # Value labels at end of bars — only for present rows; None rows
-            # already carry an "N/A" label inside their gray band.
-            for i, (eq_score, cur_score, present) in enumerate(
-                zip(equal_weighted_scores, weighted_scores, present_flags)
-            ):
-                if not present:
-                    continue
-                # if eq_score > 0.005:
-                ax1.text(eq_score + 0.01, i + bar_height/2, f"{eq_score:.2f}",
-                            va="center", fontsize=8, color="gray")
-                # if cur_score > 0.005:
-                ax1.text(cur_score + 0.01, i - bar_height/2, f"{cur_score:.2f}",
-                            va="center", fontsize=8, weight="bold")
+        # Overall score watermark — same dark gray as the current-weight
+        # bars and the legend swatch. Higher alpha so it visually reads
+        # as dark gray rather than a faded ghost. "N/A" when overall is
+        # None (no live categories).
+        watermark_text = f"{overall:.1%}" if overall is not None else "N/A"
+        ax1.text(
+            0.5, 0.5, watermark_text,
+            transform=ax1.transAxes, fontsize=48, weight="bold",
+            ha="center", va="center", alpha=0.7, color="#2c3e50"
+        )
 
-            # Overall score watermark — same dark gray as the current-weight
-            # bars and the legend swatch. Higher alpha so it visually reads
-            # as dark gray rather than a faded ghost. "N/A" when overall is
-            # None (no live categories).
-            watermark_text = f"{overall:.1%}" if overall is not None else "N/A"
-            ax1.text(
-                0.5, 0.5, watermark_text,
-                transform=ax1.transAxes, fontsize=48, weight="bold",
-                ha="center", va="center", alpha=0.7, color="#2c3e50"
-            )
+        # === RIGHT CHART: Raw Element Scores ===
+        # Each row tied to a fine-grained key, so we can gray out
+        # empty-vs-empty rows via data_presence.
+        element_rows = [
+            ("Activities",          "activity_names",      "elements"),
+            ("Events",              "event_names",         "elements"),
+            ("Gateways",            "gateway_names",       "elements"),
+            ("Seq Flows",           "seq_flows_str",       "flows"),
+            ("Msg Flows",           "mes_flows_str",       "flows"),
+            ("Pool/Lane\nNames",    "lane_names",          "organizational"),
+            ("Pool/Lane\nElements", "lane_with_refs",      "organizational"),
+            ("Subprocess\nNames",   "subprocess_names",    "subprocess"),
+            ("Subprocess\nElements","subprocess_elemrefs", "subprocess"),
+            ("Subprocess\nFlows",   "subprocess_flows",    "subprocess"),
+        ]
 
-            # === RIGHT CHART: Raw Element Scores ===
-            # Each row tied to a fine-grained key, so we can gray out
-            # empty-vs-empty rows via data_presence.
-            element_rows = [
-                ("Activities",          "activity_names",      "elements"),
-                ("Events",              "event_names",         "elements"),
-                ("Gateways",            "gateway_names",       "elements"),
-                ("Seq Flows",           "seq_flows_str",       "flows"),
-                ("Msg Flows",           "mes_flows_str",       "flows"),
-                ("Pool/Lane\nNames",    "lane_names",          "organizational"),
-                ("Pool/Lane\nElements", "lane_with_refs",      "organizational"),
-                ("Subprocess\nNames",   "subprocess_names",    "subprocess"),
-                ("Subprocess\nElements","subprocess_elemrefs", "subprocess"),
-                ("Subprocess\nFlows",   "subprocess_flows",    "subprocess"),
-            ]
+        elements_labels = []
+        element_scores = []
+        element_colors = []
+        present_flags = []
+        for label, key, category in element_rows:
+            present = data_presence.get(key, True)
+            # If both models are empty for this key, fade the row out and
+            # display "—" instead of the misleading 1.0.
+            elements_labels.append(label if present else f"{label}\n(no data)")
+            element_scores.append(result.get(key, 0) if present else 0)
+            element_colors.append(CATEGORY_COLORS[category] if present else NO_DATA_COLOR)
+            present_flags.append(present)
 
-            elements_labels = []
-            element_scores = []
-            element_colors = []
-            present_flags = []
-            for label, key, category in element_rows:
-                present = data_presence.get(key, True)
-                # If both models are empty for this key, fade the row out and
-                # display "—" instead of the misleading 1.0.
-                elements_labels.append(label if present else f"{label}\n(no data)")
-                element_scores.append(result.get(key, 0) if present else 0)
-                element_colors.append(CATEGORY_COLORS[category] if present else NO_DATA_COLOR)
-                present_flags.append(present)
+        y_pos2 = np.arange(len(elements_labels))
 
-            y_pos2 = np.arange(len(elements_labels))
+        # Plot real-score bars (gray entries for non-present rows would be
+        # zero-width and invisible, so we handle those separately below).
+        present_scores = [s if p else 0 for s, p in zip(element_scores, present_flags)]
+        present_colors = [c if p else NO_DATA_COLOR for c, p in zip(element_colors, present_flags)]
+        ax2.barh(y_pos2, present_scores, color=present_colors, alpha=0.8)
 
-            # Plot real-score bars (gray entries for non-present rows would be
-            # zero-width and invisible, so we handle those separately below).
-            present_scores = [s if p else 0 for s, p in zip(element_scores, present_flags)]
-            present_colors = [c if p else NO_DATA_COLOR for c, p in zip(element_colors, present_flags)]
-            ax2.barh(y_pos2, present_scores, color=present_colors, alpha=0.8)
+        ax2.set_yticks(y_pos2)
+        ax2.set_yticklabels(elements_labels, fontsize=9)
+        ax2.set_xlabel("Raw Score (0-1)")
+        ax2.set_xlim(0, 1.1)
+        ax2.set_title("Element-Level Breakdown (Unweighted)", fontsize=11)
+        ax2.grid(axis="x", alpha=0.3)
 
-            ax2.set_yticks(y_pos2)
-            ax2.set_yticklabels(elements_labels, fontsize=9)
-            ax2.set_xlabel("Raw Score (0-1)")
-            ax2.set_xlim(0, 1.1)
-            ax2.set_title("Element-Level Breakdown (Unweighted)", fontsize=11)
-            ax2.grid(axis="x", alpha=0.3)
+        # For non-present rows, overlay a faint gray band spanning the
+        # whole chart width so the legend's "No data" swatch is honest
+        # and the row reads as "no data" rather than "score of zero".
+        for i, present in enumerate(present_flags):
+            if not present:
+                ax2.barh(i, 1.1, color=NO_DATA_COLOR, alpha=0.5, height=0.6)
+                ax2.text(0.55, i, "no data in either model",
+                         va="center", ha="center", fontsize=8,
+                         color="gray", style="italic")
 
-            # For non-present rows, overlay a faint gray band spanning the
-            # whole chart width so the legend's "No data" swatch is honest
-            # and the row reads as "no data" rather than "score of zero".
-            for i, present in enumerate(present_flags):
-                if not present:
-                    ax2.barh(i, 1.1, color=NO_DATA_COLOR, alpha=0.5, height=0.6)
-                    ax2.text(0.55, i, "no data in either model",
-                             va="center", ha="center", fontsize=8,
-                             color="gray", style="italic")
+        for i, (score, present) in enumerate(zip(element_scores, present_flags)):
+            if present:
+                ax2.text(score + 0.02, i, f"{score:.2f}", va="center", fontsize=8)
 
-            for i, (score, present) in enumerate(zip(element_scores, present_flags)):
-                if present:
-                    ax2.text(score + 0.02, i, f"{score:.2f}", va="center", fontsize=8)
+        # Add category legend for right chart
+        legend_patches = [
+            mpatches.Patch(color=CATEGORY_COLORS["elements"], label="Elements"),
+            mpatches.Patch(color=CATEGORY_COLORS["flows"], label="Flows"),
+            mpatches.Patch(color=CATEGORY_COLORS["organizational"], label="Organizational"),
+            mpatches.Patch(color=CATEGORY_COLORS["subprocess"], label="Subprocess"),
+            mpatches.Patch(color=NO_DATA_COLOR, label="No data in either model"),
+        ]
+        ax2.legend(handles=legend_patches, loc="best", fontsize=8)
 
-            # Add category legend for right chart
-            legend_patches = [
-                mpatches.Patch(color=CATEGORY_COLORS["elements"], label="Elements"),
-                mpatches.Patch(color=CATEGORY_COLORS["flows"], label="Flows"),
-                mpatches.Patch(color=CATEGORY_COLORS["organizational"], label="Organizational"),
-                mpatches.Patch(color=CATEGORY_COLORS["subprocess"], label="Subprocess"),
-                mpatches.Patch(color=NO_DATA_COLOR, label="No data in either model"),
-            ]
-            ax2.legend(handles=legend_patches, loc="best", fontsize=8)
-
-            plt.tight_layout()
-            plt.show()
+        fig.tight_layout()
+        # Render the figure to PNG bytes and assign to the chart Image
+        # widget. .value replacement is atomic in every Jupyter frontend
+        # (JupyterLab, Classic, VS Code) — there is no list of outputs to
+        # stack on. plt.close drops the figure from pyplot's registry so
+        # the inline backend's flush_figures hook can't re-emit it.
+        import io
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+        plt.close(fig)
+        self.chart_image.value = buf.getvalue()
 
         # Structural overall changed; refresh the hybrid section so it picks
         # up the new value. (Behavioral was already refreshed by _set_metric
@@ -720,11 +803,13 @@ class BPMNSimilarityDashboard:
         # parameters. Reflect staleness in the behavioral output.
         self._render_behavioral()
         self._render_hybrid()
+        self._render_ngram_section()
 
     def _on_loop_depth_change(self, change):
         self.current_max_loop_depth = change["new"]
         self._render_behavioral()
         self._render_hybrid()
+        self._render_ngram_section()
 
     def _behavioral_is_stale(self):
         """Whether the last-extracted traces match the current parameters.
@@ -781,79 +866,313 @@ class BPMNSimilarityDashboard:
             self.current_max_loop_depth,
         )
 
+        # Fresh traces — fill the n-gram cache at the current n.
+        self._compute_and_cache_ngram_artifacts()
+
         self._render_behavioral()
         self._render_hybrid()
+        self._render_ngram_section()
+
+    def _active_behavioral_score(self):
+        """Return the headline behavioral score for the current kind.
+
+        Single source of truth used by _render_behavioral and _render_hybrid
+        — switching the kind selector is a pure read here, no recompute,
+        because both values are kept in lock-step by
+        _compute_and_cache_ngram_artifacts and _set_metric.
+        """
+        if self.current_behavioral_kind == "ngram":
+            return self._last_behavioral_ngram_score
+        return self._last_behavioral_score
 
     def _render_behavioral(self):
-        """Render the behavioral output area."""
+        """Render the behavioral output area.
+
+        Writes two atomic HTML blobs:
+
+        - ``self.behavioral_html`` — diagnostics block (stale banner,
+          soundness warnings, trace counts, "Traces matched exactly").
+          Lives next to the Compute button at the top of the section.
+        - ``self.behavioral_score_html`` — the big headline number with
+          its ``(metric)`` parenthetical. Placed at the bottom of the
+          N-gram subpanel so it sits beneath the chart and tables that
+          explain it.
+
+        Both go through atomic ``.value`` replacement to avoid the
+        Output()+clear_output(wait=True)+print/display stacking artifact
+        seen in VS Code's Jupyter renderer.
+        """
         if not self._behavioral_enabled:
             return
-        with self.behavioral_output:
-            clear_output(wait=True)
 
-            # Two reasons _last_behavioral_score can be None:
-            #   (a) user hasn't clicked "Compute behavioral" yet.
-            #   (b) compute ran, but neither model produced any extractable
-            #       traces — so behavioral similarity is undefined.
-            # Distinguish via _last_trace_result_1 (None only before compute).
-            if self._last_trace_result_1 is None:
-                print("Click 'Compute behavioral' to extract traces and score them.")
-                return
+        # Two reasons _last_behavioral_score can be None:
+        #   (a) user hasn't clicked "Compute behavioral" yet.
+        #   (b) compute ran, but neither model produced any extractable
+        #       traces — so behavioral similarity is undefined.
+        # Distinguish via _last_trace_result_1 (None only before compute).
+        if self._last_trace_result_1 is None:
+            self.behavioral_html.value = (
+                "<div style='font-family:monospace;'>"
+                "Click 'Compute behavioral' to extract traces and score them."
+                "</div>"
+            )
+            # Score widget shows nothing pre-compute — the placeholder
+            # message above already covers the empty state, and an empty
+            # widget keeps the under-the-chart slot collapsed cleanly.
+            self.behavioral_score_html.value = ""
+            return
 
-            tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
-            traces_1 = tr1.all_traces()
-            traces_2 = tr2.all_traces()
+        tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
+        traces_1 = tr1.all_traces()
+        traces_2 = tr2.all_traces()
+        lines = []  # collected as plain text rows; rendered inside <pre>.
 
-            # Staleness banner (if any extraction parameter has drifted).
-            if self._behavioral_is_stale():
-                key = self._last_extraction_key
-                print("⚠ STALE — re-click 'Compute behavioral' to refresh.")
-                print(f"   Last computed at threshold={key[0]:.2f}, "
-                      f"timeout={key[1]:.0f}s, max_loop={key[2]}")
-                print(f"   Current settings: threshold={self.current_threshold:.2f}, "
-                      f"timeout={self.current_trace_timeout:.0f}s, "
-                      f"max_loop={self.current_max_loop_depth}")
-                print()
+        # Staleness banner (if any extraction parameter has drifted).
+        if self._behavioral_is_stale():
+            key = self._last_extraction_key
+            lines.append("⚠ STALE — re-click 'Compute behavioral' to refresh.")
+            lines.append(
+                f"   Last computed at threshold={key[0]:.2f}, "
+                f"timeout={key[1]:.0f}s, max_loop={key[2]}"
+            )
+            lines.append(
+                f"   Current settings: threshold={self.current_threshold:.2f}, "
+                f"timeout={self.current_trace_timeout:.0f}s, "
+                f"max_loop={self.current_max_loop_depth}"
+            )
+            lines.append("")
 
-            # Soundness diagnostics.
-            if not (tr1.is_sound and tr2.is_sound):
-                print("⚠ Behavioral comparison includes partial results")
-                print(f"   Model 1: {tr1.diagnostics.status.value} — {tr1.diagnostics.summary}")
-                print(f"   Model 2: {tr2.diagnostics.status.value} — {tr2.diagnostics.summary}")
-                print()
+        # Soundness diagnostics.
+        if not (tr1.is_sound and tr2.is_sound):
+            lines.append("⚠ Behavioral comparison includes partial results")
+            lines.append(
+                f"   Model 1: {tr1.diagnostics.status.value} — {tr1.diagnostics.summary}"
+            )
+            lines.append(
+                f"   Model 2: {tr2.diagnostics.status.value} — {tr2.diagnostics.summary}"
+            )
+            lines.append("")
 
-            # Counts.
-            print(f"Model 1: {len(traces_1)} trace variant(s)")
-            print(f"Model 2: {len(traces_2)} trace variant(s)")
+        # Counts.
+        lines.append(f"Model 1: {len(traces_1)} trace variant(s)")
+        lines.append(f"Model 2: {len(traces_2)} trace variant(s)")
 
-            # Undefined-similarity case: both trace sets are empty.
-            if self._last_behavioral_score is None:
-                display(HTML(
-                    "<div style='font-size:20px; color:#7f8c8d; "
-                    "margin-top:10px; font-style:italic;'>"
-                    "Behavioral: N/A — no traces could be extracted from "
-                    "either model."
-                    "</div>"
-                ))
-                return
+        text_block = (
+            "<pre style='font-family:monospace; margin:0;'>"
+            + "\n".join(lines)
+            + "</pre>"
+        )
 
-            # Defined-similarity case: show intersection diagnostic and score.
-            set_1 = {tuple(t) for t in traces_1}
-            set_2 = {tuple(t) for t in traces_2}
-            print(f"Traces matched exactly: {len(set_1 & set_2)} / {len(set_1 | set_2)}")
+        # Undefined-similarity case: both trace sets are empty (or, for the
+        # n-gram kind, neither side produced any n-grams at this n).
+        active_score = self._active_behavioral_score()
+        if active_score is None:
+            self.behavioral_html.value = text_block
+            self.behavioral_score_html.value = (
+                "<div style='font-size:20px; color:#7f8c8d; "
+                "margin-top:10px; font-style:italic;'>"
+                "Behavioral: N/A — no traces could be extracted from "
+                "either model."
+                "</div>"
+            )
+            return
 
-            # Prominent score render — large dark-gray number with the metric
-            # in smaller gray text alongside, matching the structural
-            # watermark style.
-            display(HTML(
-                f"<div style='font-size:28px; font-weight:bold; "
-                f"color:#2c3e50; margin-top:10px;'>"
-                f"Behavioral: {self._last_behavioral_score:.1%} "
-                f"<span style='font-size:14px; color:#7f8c8d; "
-                f"font-weight:normal;'>"
-                f"({self._last_behavioral_metric})</span>"
-                f"</div>"
-            ))
+        # Defined-similarity case: show intersection diagnostic and score.
+        set_1 = {tuple(t) for t in traces_1}
+        set_2 = {tuple(t) for t in traces_2}
+        lines.append(
+            f"Traces matched exactly: {len(set_1 & set_2)} / {len(set_1 | set_2)}"
+        )
+        text_block = (
+            "<pre style='font-family:monospace; margin:0;'>"
+            + "\n".join(lines)
+            + "</pre>"
+        )
+        # Headline label reflects both the representation kind and the
+        # set-comparison method. For the n-gram kind we also show n so the
+        # number is fully self-describing.
+        if self.current_behavioral_kind == "ngram":
+            label = f"n-gram, n={self.current_ngram_n}, {self._last_behavioral_metric}"
+        else:
+            label = f"{self._last_behavioral_metric}"
+        score_block = (
+            f"<div style='font-size:28px; font-weight:bold; "
+            f"color:#2c3e50; margin-top:10px;'>"
+            f"Behavioral: {active_score:.1%} "
+            f"<span style='font-size:14px; color:#7f8c8d; "
+            f"font-weight:normal;'>"
+            f"({label})</span>"
+            f"</div>"
+        )
+        self.behavioral_html.value = text_block
+        self.behavioral_score_html.value = score_block
+
+    # ----- N-gram subpanel (lives inside the Behavioral section) -----
+
+    def _on_ngram_n_change(self, change):
+        """n-slider drift handler.
+
+        Trace extraction is the expensive step and depends only on
+        (threshold, timeout, loop_depth) — none of which involve n. So when
+        the n-slider drifts we just recompute the cheap n-gram artifacts
+        from the cached traces. We deliberately do NOT call extract_traces.
+        """
+        self.current_ngram_n = change["new"]
+        if self._last_trace_result_1 is not None and not self._behavioral_is_stale():
+            self._compute_and_cache_ngram_artifacts()
+            # Headline behavioral and hybrid follow n when the n-gram kind
+            # is active. Cheap (no extraction) so we always re-render rather
+            # than guarding on the active kind — keeps the label's
+            # `n=N` annotation consistent if the user flips kind right after.
+            self._render_behavioral()
+            self._render_hybrid()
+        # If traces are stale we skip the recompute and let the next render
+        # show the STALE banner with whatever n the cache was last built at.
+        self._render_ngram_section()
+
+    def _compute_and_cache_ngram_artifacts(self):
+        """Fill the _last_ngram_* caches at the current n.
+
+        Called from _on_compute_behavioral (initial fill, always with the
+        active n) and from _on_ngram_n_change (cheap recompute when the user
+        drags the n-slider while traces are fresh).
+        """
+        # Lazy import — mirrors the lazy `import io` pattern at the bottom of
+        # _update_visualization. Keeps the rendering→bpmn_similarity import
+        # edge one-way and avoids paying the import cost when behavioral is
+        # disabled.
+        from bpmn_similarity import calculate_ngram_similarity
+
+        n = self.current_ngram_n
+        tr1, tr2 = self._last_trace_result_1, self._last_trace_result_2
+        # All six metrics are computed and cached so the headline behavioral
+        # score (and the hybrid line below it) can flip instantly when the
+        # user clicks a different metric in the global panel — no need to
+        # recompute or re-extract traces. Computing all six is cheap relative
+        # to trace extraction (set ops over the already-extracted n-gram
+        # lists).
+        self._last_ngram_metrics = {
+            "n": n,
+            "jaccard": calculate_ngram_similarity(tr1, tr2, n=n, method="jaccard"),
+            "dice": calculate_ngram_similarity(tr1, tr2, n=n, method="dice"),
+            "overlap": calculate_ngram_similarity(tr1, tr2, n=n, method="overlap"),
+            "precision": calculate_ngram_similarity(tr1, tr2, n=n, method="precision"),
+            "recall": calculate_ngram_similarity(tr1, tr2, n=n, method="recall"),
+            "f1": calculate_ngram_similarity(tr1, tr2, n=n, method="f1"),
+        }
+        # Headline n-gram score at the active metric. Pulled from the cache
+        # above rather than recomputed — same value, separately named so the
+        # _active_behavioral_score() consumer has a clear single field to read.
+        self._last_behavioral_ngram_score = self._last_ngram_metrics[self.current_metric]
+        self._last_ngram_counts = self._compute_ngram_counts(tr1, tr2, n)
+        self._last_ngram_n = n
+
+    def _compute_ngram_counts(self, traces_1, traces_2, n):
+        """Return per-side / shared / unique distinct-n-gram counts.
+
+        The n-gram subpanel shows a short text summary instead of an
+        enumerated list of top n-grams, so we only need cardinalities of the
+        distinct-n-gram sets, not the n-grams themselves. This keeps the
+        renderer free of any extract_ngrams call at refresh time.
+
+        Padding is left enabled (matches the similarity scores, which also
+        use padding) so the boundary markers ``<START>`` / ``<END>`` count
+        the same way they do upstream.
+        """
+        from trace_extraction import extract_ngrams
+
+        ngrams_1 = set(extract_ngrams(traces_1, n=n, pad=True))
+        ngrams_2 = set(extract_ngrams(traces_2, n=n, pad=True))
+        shared = len(ngrams_1 & ngrams_2)
+        only_1 = len(ngrams_1 - ngrams_2)
+        only_2 = len(ngrams_2 - ngrams_1)
+        union = shared + only_1 + only_2
+        # Jaccard-style overlap on the union — matches what users see on the
+        # headline behavioral score when "jaccard" is the active metric, and
+        # gives a meaningful 0% / 100% even when the two sides are very
+        # different sizes.
+        overlap_pct = (shared / union) if union else 0.0
+        return {
+            "total_1": len(ngrams_1),
+            "total_2": len(ngrams_2),
+            "shared": shared,
+            "only_1": only_1,
+            "only_2": only_2,
+            "union": union,
+            "overlap_pct": overlap_pct,
+        }
+
+    def _render_ngram_section(self):
+        """Top-level renderer for the n-gram subpanel.
+
+        Writes a short text summary of n-gram cardinalities into the single
+        ``ngram_top_html`` widget. The headline behavioral score (rendered
+        one widget below by ``_render_behavioral``) carries the value of
+        the globally-selected metric, so this section deliberately does
+        not duplicate that as a chart.
+        """
+        if not self._behavioral_enabled:
+            return
+
+        # No traces extracted yet → show a one-line placeholder. Atomic
+        # value replacement, same anti-stacking pattern as behavioral_html.
+        if self._last_trace_result_1 is None:
+            self.ngram_top_html.value = (
+                "<div style='font-family:sans-serif; font-size:12px; "
+                "color:#7f8c8d;'><i>Click 'Compute behavioral' above to "
+                "populate n-gram analysis.</i></div>"
+            )
+            return
+
+        # n-only drift while traces are still fresh: recompute cheaply so the
+        # summary reflects the slider position immediately. Stale traces
+        # (threshold/timeout/loop-depth drift) are NOT silently recomputed —
+        # we keep showing the last cache and annotate STALE in the summary.
+        if (
+            self._last_ngram_n != self.current_ngram_n
+            and not self._behavioral_is_stale()
+        ):
+            self._compute_and_cache_ngram_artifacts()
+
+        self._render_ngram_summary()
+
+    def _render_ngram_summary(self):
+        """Render the n-gram cardinality summary as a few lines of HTML."""
+        counts = self._last_ngram_counts
+        n = self._last_ngram_n
+        stale = self._behavioral_is_stale()
+        stale_suffix = (
+            " <i style='color:#c0392b;'>— stale, re-Compute behavioral</i>"
+            if stale else ""
+        )
+
+        # Bold numbers, plain prose. No n-gram tokens listed — the user only
+        # needs the cardinalities for context; the headline behavioral
+        # number below already conveys "how similar" at the active metric.
+        lines = [
+            (
+                f"<b>n = {n}</b>: Model 1 produced "
+                f"<b>{counts['total_1']}</b> distinct n-gram"
+                f"{'s' if counts['total_1'] != 1 else ''}; "
+                f"Model 2 produced <b>{counts['total_2']}</b>."
+                f"{stale_suffix}"
+            ),
+            (
+                f"<b>{counts['shared']}</b> shared "
+                f"(<b>{counts['overlap_pct']:.1%}</b> of the union of "
+                f"<b>{counts['union']}</b>)."
+            ),
+            (
+                f"<b>{counts['only_1']}</b> unique to Model 1, "
+                f"<b>{counts['only_2']}</b> unique to Model 2."
+            ),
+        ]
+        self.ngram_top_html.value = (
+            "<div style='font-family:sans-serif; font-size:12px; "
+            "line-height:1.6;'>"
+            + "<br>".join(lines)
+            + "</div>"
+        )
 
     # ----- Hybrid section -----
 
@@ -863,106 +1182,113 @@ class BPMNSimilarityDashboard:
     def _render_hybrid(self):
         if not self._behavioral_enabled:
             return
-        with self.hybrid_output:
-            clear_output(wait=True)
 
-            structural_overall = self._last_overall
-            beh_score = self._last_behavioral_score
-            behavioral_was_computed = self._last_trace_result_1 is not None
+        structural_overall = self._last_overall
+        beh_score = self._active_behavioral_score()
+        behavioral_was_computed = self._last_trace_result_1 is not None
 
-            # "Not yet computed" placeholder: either structural hasn't rendered
-            # yet (no _last_overall) or behavioral hasn't been clicked yet.
-            if structural_overall is None or not behavioral_was_computed:
-                print("Compute structural (above) and behavioral, then the "
-                      "hybrid score will appear here.")
-                return
-
-            # Use the user-weighted overall (self._last_overall), NOT
-            # self._last_result["overall"] which holds the default-weighted
-            # value computed by calculate_bpmn_similarity and doesn't reflect
-            # the structural weight sliders.
-            #
-            # calculate_hybrid_similarity handles None on either side: when
-            # behavioral is None (no traces), hybrid = structural with effective
-            # weights 1.0/0.0; when structural is None (no comparable
-            # categories — later phases), hybrid = behavioral; both None →
-            # hybrid None.
-            hybrid = self.calculate_hybrid(
-                {"overall": structural_overall},
-                beh_score,
-                structural_weight=self.hybrid_weight_slider.value,
+        # "Not yet computed" placeholder: either structural hasn't rendered
+        # yet (no _last_overall) or behavioral hasn't been clicked yet.
+        if structural_overall is None or not behavioral_was_computed:
+            self.hybrid_output.value = (
+                "<div style='font-family:monospace;'>"
+                "Compute structural (above) and behavioral, then the "
+                "hybrid score will appear here."
+                "</div>"
             )
+            return
 
-            # stale_note = (
-            #     " <span style='color:#e67e22;'>⚠ behavioral is STALE</span>"
-            #     if self._behavioral_is_stale() and beh_score is not None else ""
-            # )
-            # Stale annotations for either side.
-            structural_stale = self._structural_is_stale()
-            behavioral_stale = self._behavioral_is_stale() and beh_score is not None
+        # Use the user-weighted overall (self._last_overall), NOT
+        # self._last_result["overall"] which holds the default-weighted
+        # value computed by calculate_bpmn_similarity and doesn't reflect
+        # the structural weight sliders.
+        #
+        # calculate_hybrid_similarity handles None on either side: when
+        # behavioral is None (no traces), hybrid = structural with effective
+        # weights 1.0/0.0; when structural is None (no comparable
+        # categories — later phases), hybrid = behavioral; both None →
+        # hybrid None.
+        hybrid = self.calculate_hybrid(
+            {"overall": structural_overall},
+            beh_score,
+            structural_weight=self.hybrid_weight_slider.value,
+        )
 
-            structural_stale_note = (
-                " <span style='color:#e67e22;'>⚠ structural is STALE</span>"
-                if structural_stale else ""
+        # Stale annotations for either side.
+        structural_stale = self._structural_is_stale()
+        behavioral_stale = self._behavioral_is_stale() and beh_score is not None
+
+        structural_stale_note = (
+            " <span style='color:#e67e22;'>⚠ structural is STALE</span>"
+            if structural_stale else ""
+        )
+        behavioral_stale_note = (
+            " <span style='color:#e67e22;'>⚠ behavioral is STALE</span>"
+            if behavioral_stale else ""
+        )
+
+        def _fmt(score):
+            """Format a score or 'N/A' for None."""
+            return f"{score:.1%}" if score is not None else "N/A"
+
+        # Header lines: structural and behavioral contributions. When one
+        # is N/A, show 'N/A' and 0% weight; the other will show 100%.
+        structural_line = (
+            f"<div style='color:#555; font-size:13px;'>"
+            f"Structural: <b>{_fmt(hybrid['structural'])}</b> × "
+            f"{hybrid['structural_weight']:.0%}{structural_stale_note}"
+            f"</div>"
+        )
+        behavioral_line = (
+            f"<div style='color:#555; font-size:13px;'>"
+            f"Behavioral: <b>{_fmt(hybrid['behavioral'])}</b> × "
+            f"{hybrid['behavioral_weight']:.0%}{behavioral_stale_note}"
+            f"</div>"
+        )
+
+        # Hybrid line: main prominent number, or N/A.
+        if hybrid['hybrid'] is None:
+            hybrid_line = (
+                "<div style='font-size:36px; font-weight:bold; "
+                "color:#7f8c8d; margin-top:8px; font-style:italic;'>"
+                "Hybrid: N/A "
+                "<span style='font-size:14px; font-weight:normal;'>"
+                "(no structural or behavioral data)</span>"
+                "</div>"
             )
-            behavioral_stale_note = (
-                " <span style='color:#e67e22;'>⚠ behavioral is STALE</span>"
-                if behavioral_stale else ""
-            )
-
-            def _fmt(score):
-                """Format a score or 'N/A' for None."""
-                return f"{score:.1%}" if score is not None else "N/A"
-
-            # Header lines: structural and behavioral contributions. When one
-            # is N/A, show 'N/A' and 0% weight; the other will show 100%.
-            structural_line = (
-                f"<div style='color:#555; font-size:13px;'>"
-                f"Structural: <b>{_fmt(hybrid['structural'])}</b> × "
-                f"{hybrid['structural_weight']:.0%}{structural_stale_note}"
-                f"</div>"
-            )
-            behavioral_line = (
-                f"<div style='color:#555; font-size:13px;'>"
-                f"Behavioral: <b>{_fmt(hybrid['behavioral'])}</b> × "
-                f"{hybrid['behavioral_weight']:.0%}{behavioral_stale_note}"
-                f"</div>"
-            )
-
-            # Hybrid line: main prominent number, or N/A.
-            if hybrid['hybrid'] is None:
-                hybrid_line = (
-                    "<div style='font-size:36px; font-weight:bold; "
-                    "color:#7f8c8d; margin-top:8px; font-style:italic;'>"
-                    "Hybrid: N/A "
-                    "<span style='font-size:14px; font-weight:normal;'>"
-                    "(no structural or behavioral data)</span>"
-                    "</div>"
-                )
+        else:
+            # If only one side contributed, annotate which.
+            note = ""
+            if hybrid['structural'] is None:
+                note = " <span style='font-size:14px; color:#7f8c8d; font-weight:normal;'>(behavioral only)</span>"
+            elif hybrid['behavioral'] is None:
+                note = " <span style='font-size:14px; color:#7f8c8d; font-weight:normal;'>(structural only)</span>"
             else:
-                # If only one side contributed, annotate which.
-                note = ""
-                if hybrid['structural'] is None:
-                    note = " <span style='font-size:14px; color:#7f8c8d; font-weight:normal;'>(behavioral only)</span>"
-                elif hybrid['behavioral'] is None:
-                    note = " <span style='font-size:14px; color:#7f8c8d; font-weight:normal;'>(structural only)</span>"
-                else:
-                    note = (
-                        f" <span style='font-size:14px; color:#7f8c8d; "
-                        f"font-weight:normal;'>(metric: {self.current_metric})</span>"
+                if self.current_behavioral_kind == "ngram":
+                    metric_label = (
+                        f"n-gram, n={self.current_ngram_n}, "
+                        f"{self.current_metric}"
                     )
-                hybrid_line = (
-                    f"<div style='font-size:36px; font-weight:bold; "
-                    f"color:#2c3e50; margin-top:8px;'>"
-                    f"Hybrid: {hybrid['hybrid']:.1%}{note}"
-                    f"</div>"
+                else:
+                    metric_label = self.current_metric
+                note = (
+                    f" <span style='font-size:14px; color:#7f8c8d; "
+                    f"font-weight:normal;'>(metric: {metric_label})</span>"
                 )
-
-            display(HTML(
-                f"<div style='font-family:sans-serif; line-height:1.5;'>"
-                f"{structural_line}{behavioral_line}{hybrid_line}"
+            hybrid_line = (
+                f"<div style='font-size:36px; font-weight:bold; "
+                f"color:#2c3e50; margin-top:8px;'>"
+                f"Hybrid: {hybrid['hybrid']:.1%}{note}"
                 f"</div>"
-            ))
+            )
+
+        # Atomic value replacement — same anti-stacking pattern used by
+        # behavioral_html and ngram_top_html.
+        self.hybrid_output.value = (
+            f"<div style='font-family:sans-serif; line-height:1.5;'>"
+            f"{structural_line}{behavioral_line}{hybrid_line}"
+            f"</div>"
+        )
 
     def get_overall_score(self):
         """Return the most recent user-weighted overall structural score.
@@ -999,7 +1325,7 @@ class BPMNSimilarityDashboard:
             self.subprocess_slider,
             button_box,
             self.message_output,
-            self.output,
+            self.chart_image,
         ]
 
         if self._behavioral_enabled:
@@ -1007,13 +1333,26 @@ class BPMNSimilarityDashboard:
             # the placeholders show until the user clicks the buttons.
             self._render_behavioral()
             self._render_hybrid()
+            self._render_ngram_section()
+            behavioral_kind_box = widgets.HBox(
+                list(self.behavioral_kind_buttons.values())
+            )
             sections.extend([
                 widgets.HTML("<hr><h3>Behavioral Similarity</h3>"),
+                widgets.HTML("<b>Behavioral representation:</b>"),
+                behavioral_kind_box,
                 widgets.HTML("<b>Trace extraction parameters:</b>"),
                 self.trace_timeout_slider,
                 self.loop_depth_slider,
                 self.compute_behavioral_button,
-                self.behavioral_output,
+                self.behavioral_html,
+                widgets.HTML("<b>N-gram comparison:</b>"),
+                self.ngram_n_slider,
+                self.ngram_top_html,
+                # Headline behavioral score lives here — under the chart
+                # and tables that explain it. _render_behavioral writes
+                # into this widget separately from self.behavioral_html.
+                self.behavioral_score_html,
                 widgets.HTML("<hr><h3>Hybrid Similarity</h3>"),
                 self.hybrid_weight_slider,
                 self.hybrid_output,
