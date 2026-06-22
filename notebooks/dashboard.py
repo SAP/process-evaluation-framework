@@ -1383,24 +1383,37 @@ def _behavioral_diagnostics(behavioral_kind, metric_radio, ngram_n, tr1, tr2):
     # (sound / partial / loop-cap when nonzero), then truncation notes
     # when present. Replaces the colored badge + pill chips, which read
     # as more important than the KPI below them.
+    #
+    # "sound" = traces that reached the final marking exactly (complete
+    # executions). "partial" = prefixes that ended in a deadlock or were
+    # cut off by the loop-depth cap. When truncation flags are set, the
+    # numbers are by definition incomplete — surface that prominently
+    # rather than as a quiet trailing clause.
     def _chips_for(label, tr):
         d = tr.diagnostics
         status_text = d.status.value.replace("_", " ")
         parts = [
-            f"{d.sound_variant_count:,} sound",
-            f"{d.partial_trace_count:,} partial",
+            f"{d.sound_variant_count:,} complete variant(s)",
+            f"{d.partial_trace_count:,} partial trace(s)",
         ]
         loop_total = sum(d.loop_cap_hits.values())
         if loop_total:
-            parts.append(f"{loop_total:,} loop-cap")
+            parts.append(f"{loop_total:,} loop-cap hit(s)")
         notes = []
         if d.truncated_by_timeout:
             notes.append("timed out")
         if d.truncated_by_active_cap:
             notes.append("active-set cap")
         counts = ", ".join(parts)
-        notes_clause = f"; truncated by {', '.join(notes)}" if notes else ""
-        return f"<div>{label}: {status_text}; {counts}{notes_clause}.</div>"
+        if notes:
+            warn = (
+                f" <strong style='color:#b45309;'>"
+                f"counts incomplete — exploration truncated by "
+                f"{', '.join(notes)}</strong>"
+            )
+        else:
+            warn = ""
+        return f"<div>{label}: {status_text}; {counts}.{warn}</div>"
 
     diagnostics_html = (
         "<div class='pe-muted' style='padding:2px 0 4px 0;'>"
