@@ -201,6 +201,23 @@ def _theme(mo):
         list-style: disc;
     }
     .pe-norm-list li { margin: 2px 0; font-size: 12.5px; }
+    /* Inline radios — when wrapped in ``.pe-radio-spread`` the options
+       fan out evenly across the full row width with a touch of side
+       padding so the first/last circles aren't flush against the card
+       edge. Targets marimo's inline radiogroup container. */
+    .pe-radio-spread marimo-radio > div,
+    .pe-radio-spread [role="radiogroup"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        padding: 0 8px !important;
+        gap: 8px !important;
+    }
+    .pe-radio-spread marimo-radio { display: block !important; width: 100% !important; }
+    .pe-radio-spread marimo-radio label { text-transform: none; }
     </style>
     """
 
@@ -347,19 +364,29 @@ def _bpmn_options(EXAMPLES_DIR):
 @app.cell
 def _model_pickers(bpmn_options, default_1, default_2, mo):
     model1_dd = mo.ui.dropdown(
-        options=bpmn_options, value=default_1, label="Model 1 (reference)"
+        options=bpmn_options,
+        value=default_1,
+        label="Model 1 (reference)",
+        full_width=True,
     )
     model2_dd = mo.ui.dropdown(
-        options=bpmn_options, value=default_2, label="Model 2 (compare)"
+        options=bpmn_options,
+        value=default_2,
+        label="Model 2 (compare)",
+        full_width=True,
     )
     return model1_dd, model2_dd
 
 
 @app.cell
 def _models_card(card, mo, model1_dd, model2_dd):
+    # Lay the two dropdowns side-by-side (equal-width columns, small gap)
+    # so they each span half the card with a touch of breathing room on
+    # the outer edges. ``full_width=True`` on the dropdowns themselves
+    # makes them stretch to fill their column.
     card(
         "Models",
-        mo.vstack([model1_dd, model2_dd], gap=1),
+        mo.hstack([model1_dd, model2_dd], widths="equal", gap=1),
         info=(
             "Pick the two BPMN files to compare. Changing either model "
             "re-runs every section below."
@@ -485,9 +512,18 @@ def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
 
 @app.cell
 def _global_controls(mo):
+    # Display labels are Capitalized; the radio's ``value`` stays
+    # lowercase so the similarity functions keep working unchanged.
     metric_radio = mo.ui.radio(
-        options=["dice", "jaccard", "overlap", "precision", "recall", "f1"],
-        value="dice",
+        options={
+            "Dice": "dice",
+            "Jaccard": "jaccard",
+            "Overlap": "overlap",
+            "Precision": "precision",
+            "Recall": "recall",
+            "F1": "f1",
+        },
+        value="Dice",
         label="Set-comparison metric",
         inline=True,
     )
@@ -504,6 +540,12 @@ def _global_controls(mo):
 
 @app.cell
 def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_html, threshold_slider):
+    # Wrap the inline radio so the ``.pe-radio-spread`` CSS rule kicks in
+    # — options fan out evenly across the full card width instead of
+    # bunching at the left edge.
+    _metric_row = mo.Html(
+        "<div class='pe-radio-spread'>" + metric_radio.text + "</div>"
+    )
     card(
         "Global controls",
         mo.md(
@@ -513,7 +555,7 @@ def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_ht
         ),
         mo.vstack(
             [
-                metric_radio,
+                _metric_row,
                 threshold_slider,
                 normalization_summary_html(name_mappings),
             ],
@@ -941,6 +983,8 @@ def _fig_weighted_contributions(
             xanchor="left",
             x=0,
             font=dict(size=11),
+            entrywidth=0,
+            traceorder="normal",
         ),
         font=dict(family="sans-serif", color="#334155"),
     )
@@ -950,7 +994,11 @@ def _fig_weighted_contributions(
         title_text="Weighted score (score × weight)",
         title_font=dict(size=11),
     )
-    _fig.update_yaxes(autorange="reversed", gridcolor="#eef0f3")
+    _fig.update_yaxes(
+        autorange="reversed",
+        gridcolor="#eef0f3",
+        ticklabelstandoff=8,
+    )
     fig_weighted = _fig
     return (fig_weighted,)
 
@@ -1055,6 +1103,8 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
             xanchor="left",
             x=0,
             font=dict(size=11),
+            entrywidth=0,
+            traceorder="normal",
         ),
         font=dict(family="sans-serif", color="#334155"),
     )
@@ -1064,7 +1114,11 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
         title_text="Raw score (0–1)",
         title_font=dict(size=11),
     )
-    _fig2.update_yaxes(autorange="reversed", gridcolor="#eef0f3")
+    _fig2.update_yaxes(
+        autorange="reversed",
+        gridcolor="#eef0f3",
+        ticklabelstandoff=8,
+    )
     fig_breakdown = _fig2
     return (fig_breakdown,)
 
