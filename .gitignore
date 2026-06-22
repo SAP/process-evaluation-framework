@@ -146,3 +146,5 @@ poetry.toml
 
 examples/testing_models/
 docs/plans/
+
+dev.ipynb

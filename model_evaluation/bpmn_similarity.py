@@ -12,10 +12,10 @@
 # hybrid combiner just weights two scores in [0, 1] and is cheap to recompute
 # as the user adjusts the structural/behavioral weight.
 
-from typing import List, Union
+from typing import List, Union, Literal
 
 from bpmn_sets import extract_bpmn_sets
-from trace_extraction import TraceExtractionResult
+from trace_extraction import TraceExtractionResult, extract_ngrams, extract_traces
 from utils.list_similarity import dice_list, index_list, jaccard_list, overlap_list, scores
 
 # Public type alias: most similarity helpers accept either raw traces or a
@@ -103,6 +103,50 @@ def calculate_trace_similarity(
         raise ValueError(f"Unknown similarity method: {method}")
 
 
+def calculate_ngram_similarity(
+    traces_1: TracesOrResult,
+    traces_2: TracesOrResult,
+    n: int = 2,
+    method: Literal["jaccard", "dice", "overlap", "precision", "recall", "f1"] = "jaccard",
+    pad: bool = True,
+) -> float:
+    """Set-based n-gram similarity between two trace collections.
+
+    Decomposes each side into length-n contiguous subsequences, dedupes to a set,
+    and scores with the same metrics :func:`calculate_trace_similarity` supports.
+
+    Args:
+        traces_1: First trace set or a class TraceExtractionResult
+        traces_2: Second trace set, same accepted shapes
+        n: N-gram window length. Must be >= 1
+        method
+        pad: Whether to wrap each trace with <START> / <END>
+
+    Returns:
+        Similarity score between 0.0 and 1.0.
+    """
+    # The *_list / scores helpers each call `set(...)` on their inputs
+    # internally (see utils/list_similarity.py), so passing the raw n-gram
+    # list is enough — no need to dedupe here.
+    ngrams_1 = extract_ngrams(traces_1, n=n, pad=pad)
+    ngrams_2 = extract_ngrams(traces_2, n=n, pad=pad)
+
+    if method == "jaccard":
+        score, _ = jaccard_list(ngrams_1, ngrams_2)
+        return score
+    elif method == "dice":
+        score, _ = dice_list(ngrams_1, ngrams_2)
+        return score
+    elif method == "overlap":
+        score, _ = overlap_list(ngrams_1, ngrams_2)
+        return score
+    elif method in {"precision", "recall", "f1"}:
+        score, _ = scores(ngrams_1, ngrams_2, score_type=method)
+        return score
+    else:
+        raise ValueError(f"Unknown similarity method: {method}")
+
+
 def calculate_bpmn_similarity(
     bpmn_object1,
     bpmn_object2,
@@ -156,6 +200,8 @@ def calculate_bpmn_similarity(
             fine_scores[key] = dice_list(l1, l2)[0]
         elif method == "jaccard":
             fine_scores[key] = jaccard_list(l1, l2)[0]
+        elif method == "overlap":
+            fine_scores[key] = overlap_list(l1, l2)[0]
         elif method in {"precision", "recall", "f1"}:
             fine_scores[key] = scores(l1, l2, score_type=method)[0]
         else:
