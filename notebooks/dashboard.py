@@ -122,6 +122,17 @@ def _theme(mo):
     .pe-chip-partial { color: #b45309; background: #fef3c7; }
     .pe-chip-loop    { color: #6d28d9; background: #ede9fe; }
     .pe-chip-notes   { font-size: 12px; color: #64748b; padding-left: 76px; }
+    .pe-norm-list {
+        margin: 4px 0 0 0;
+        padding: 6px 10px 6px 26px;
+        max-height: 180px;
+        overflow-y: auto;
+        background: #f8fafc;
+        border: 1px solid #eef0f3;
+        border-radius: 8px;
+        list-style: disc;
+    }
+    .pe-norm-list li { margin: 2px 0; font-size: 12.5px; }
     </style>
     """
 
@@ -155,7 +166,8 @@ def _theme(mo):
 
     def normalization_summary_html(name_mappings):
         """Short summary of what the normalization threshold did:
-        total count, per-category breakdown, and 3 example mappings.
+        total count, per-category breakdown, and the full list of mappings
+        rendered in a scrollable panel.
 
         ``name_mappings`` is the dict returned by ``normalize_atomic_names``:
         keys are scopes (``activity_names``, ``event_names``, …, plus
@@ -163,15 +175,16 @@ def _theme(mo):
         dicts.
         """
         # Category labels in display order; merge top-level + __subprocess scopes.
+        # Each entry: (plural label for breakdown, singular label for per-row prefix, scope keys).
         categories = [
-            ("activities", ["activity_names", "activity_names__subprocess"]),
-            ("events",     ["event_names",    "event_names__subprocess"]),
-            ("gateways",   ["gateway_names",  "gateway_names__subprocess"]),
-            ("pools",      ["pool_names"]),
-            ("lanes",      ["lane_names"]),
+            ("activities", "Activity", ["activity_names", "activity_names__subprocess"]),
+            ("events",     "Event",    ["event_names",    "event_names__subprocess"]),
+            ("gateways",   "Gateway",  ["gateway_names",  "gateway_names__subprocess"]),
+            ("pools",      "Pool",     ["pool_names"]),
+            ("lanes",      "Lane",     ["lane_names"]),
         ]
         counts = {}
-        for label, keys in categories:
+        for label, _singular, keys in categories:
             n = sum(len(name_mappings.get(k, {})) for k in keys)
             if n:
                 counts[label] = n
@@ -184,29 +197,24 @@ def _theme(mo):
 
         breakdown = ", ".join(f"{n} {label}" for label, n in counts.items())
 
-        # First 3 examples across all scopes, in the iteration order above.
-        examples = []
-        for _, keys in categories:
+        # All mappings across all scopes, in the iteration order above.
+        items = []
+        for _label, singular, keys in categories:
             for k in keys:
                 for src, dst in name_mappings.get(k, {}).items():
-                    examples.append((src, dst))
-                    if len(examples) == 3:
-                        break
-                if len(examples) == 3:
-                    break
-            if len(examples) == 3:
-                break
+                    items.append((singular, src, dst))
 
-        examples_html = "".join(
-            f"<li><code>{src}</code> → <code>{dst}</code></li>"
-            for src, dst in examples
+        rows_html = "".join(
+            f"<li><strong>{kind}:</strong> "
+            f"<code>{src}</code> → <code>{dst}</code></li>"
+            for kind, src, dst in items
         )
         return mo.Html(
             f"<div class='pe-muted' style='padding:4px 0 0 0;'>"
             f"<div><strong>{total}</strong> names from Model 2 mapped to Model 1 "
             f"({breakdown}).</div>"
-            f"<div style='margin-top:4px;'>Examples:</div>"
-            f"<ul style='margin:2px 0 0 1.2em; padding:0;'>{examples_html}</ul>"
+            f"<div style='margin-top:4px;'>All mappings:</div>"
+            f"<ul class='pe-norm-list'>{rows_html}</ul>"
             f"</div>"
         )
 
@@ -440,6 +448,19 @@ def _structural_weight_state(mo, struct_result):
     def _init(key, default_pct):
         return int(round(_weights_used.get(key, default_pct / 100) * 100))
 
+    # The values the sliders are seeded with on first render of this
+    # model pair — derived from ``weights_used`` returned by the structural
+    # similarity calculation (it normalizes against live categories). These
+    # are also what the "Reset to default values" button restores, so a
+    # reset returns the sliders to exactly the positions they had on load
+    # for the currently-selected models.
+    weight_initial = {
+        "elements": _init("elements", 35),
+        "flows": _init("flows", 25),
+        "organizational": _init("organizational", 20),
+        "subprocess": _init("subprocess", 20) if _has_sub else 0,
+    }
+
     # Which categories are "live" — have a score in at least one model and,
     # for subprocess, an actually-expanded subprocess. Dead categories must
     # stay at 0 and not participate in normalization.
@@ -518,12 +539,7 @@ def _structural_weight_state(mo, struct_result):
         return {k: floors.get(k, 0) for k in keys}
 
     get_weights, set_weights = mo.state(
-        {
-            "elements": _init("elements", 35),
-            "flows": _init("flows", 25),
-            "organizational": _init("organizational", 20),
-            "subprocess": _init("subprocess", 20) if _has_sub else 0,
-        },
+        dict(weight_initial),
         # The slider on_change handlers live in the same cell that reads
         # get_weights() to build the sliders. Without this, marimo blocks
         # the cell from re-running in response to its own set_weights() call
@@ -538,6 +554,7 @@ def _structural_weight_state(mo, struct_result):
         rescale_to_100,
         set_weights,
         weight_defaults,
+        weight_initial,
         weight_live,
     )
 
@@ -597,17 +614,14 @@ def _structural_weight_sliders(
 @app.cell
 def _structural_weight_controls(
     mo,
-    rescale_to_100,
     set_weights,
-    weight_defaults,
-    weight_live,
+    weight_initial,
 ):
-    # Reset button — restores the canonical default percentages
-    # (35 / 25 / 20 / 20), rescaling through ``rescale_to_100`` so the live
-    # categories sum to exactly 100 even when subprocess is absent and the
-    # raw defaults only add up to 80.
+    # Reset button — restores the slider values the cell first rendered
+    # with for the currently-selected model pair (``weight_initial``), which
+    # is what the user perceives as the "initial" state of the section.
     def _reset(_event):
-        set_weights(rescale_to_100(weight_defaults, weight_live))
+        set_weights(dict(weight_initial))
 
     reset_button = mo.ui.button(label="Reset to default values", on_click=_reset)
     return (reset_button,)
@@ -666,7 +680,23 @@ def _fig_weighted_contributions(
     _hls = struct_result["high_level_scores"]
     _keys = ["elements", "flows", "organizational", "subprocess"]
     _labels = ["Elements", "Flows", "Organizational", "Subprocess"]
-    _present_flags = [_hls.get(_k) is not None for _k in _keys]
+
+    # "Has data" per category is rolled up from the fine-grained
+    # ``data_presence`` flags so the no-data banner triggers ONLY when both
+    # models are empty for every fine key in that category — looser checks
+    # (e.g. ``_hls.get(key) is not None``) can flip to "missing" for other
+    # reasons.
+    _dp = struct_result.get("data_presence", {})
+    _category_fine_keys = {
+        "elements":       ["activity_names", "event_names", "gateway_names"],
+        "flows":          ["seq_flows_str", "mes_flows_str"],
+        "organizational": ["lane_names", "lane_with_refs"],
+        "subprocess":     ["subprocess_names", "subprocess_elemrefs", "subprocess_flows"],
+    }
+    _present_flags = [
+        any(_dp.get(_fk, True) for _fk in _category_fine_keys[_k])
+        for _k in _keys
+    ]
     _raw = [_hls.get(_k) if _p else 0 for _k, _p in zip(_keys, _present_flags)]
 
     # Normalize weights against the live-category sum so the stacked bar
@@ -687,6 +717,11 @@ def _fig_weighted_contributions(
     _max_val = max(_weighted + _equal_weighted) if (_weighted + _equal_weighted) else 0
     _xlim = max(0.5, _max_val * 1.3)
 
+    # Outside-bar numeric labels, blank on no-data rows so the banner row
+    # isn't cluttered with stray ``0.00``s.
+    _eq_text = [f"{v:.2f}" if p else "" for v, p in zip(_equal_weighted, _present_flags)]
+    _cur_text = [f"{v:.2f}" if p else "" for v, p in zip(_weighted, _present_flags)]
+
     _fig = go.Figure()
     _fig.add_bar(
         orientation="h",
@@ -695,6 +730,9 @@ def _fig_weighted_contributions(
         name=f"Equal weights ({fmt_pct(overall_equal)})",
         marker_color=NO_DATA_COLOR,
         opacity=0.55,
+        text=_eq_text,
+        textposition="outside",
+        textfont=dict(size=10, color="#334155"),
         hovertemplate="<b>%{y}</b><br>Equal-weight contribution: %{x:.3f}<extra></extra>",
     )
     _fig.add_bar(
@@ -704,29 +742,50 @@ def _fig_weighted_contributions(
         name=f"Current weights ({fmt_pct(overall)})",
         marker_color="#2c3e50",
         opacity=0.92,
+        text=_cur_text,
+        textposition="outside",
+        textfont=dict(size=10, color="#334155"),
         hovertemplate="<b>%{y}</b><br>Weighted contribution: %{x:.3f}<extra></extra>",
     )
 
-    # Grey "no data" overlay row(s).
-    if not all(_present_flags):
+    # Unified "no data in either model" banner — solid grey row spanning the
+    # full axis with centered bold white text. Same treatment as the
+    # element-level breakdown chart.
+    _missing = [lbl for lbl, p in zip(_labels, _present_flags) if not p]
+    if _missing:
         _fig.add_bar(
             orientation="h",
-            y=[lbl for lbl, p in zip(_labels, _present_flags) if not p],
-            x=[_xlim for p in _present_flags if not p],
+            y=_missing,
+            x=[_xlim] * len(_missing),
             marker_color=NO_DATA_COLOR,
-            opacity=0.35,
+            opacity=0.6,
             showlegend=False,
             hoverinfo="skip",
         )
-        for _lbl, _p in zip(_labels, _present_flags):
-            if not _p:
-                _fig.add_annotation(
-                    x=_xlim * 0.5,
-                    y=_lbl,
-                    text="<i>N/A — no data in either model</i>",
-                    showarrow=False,
-                    font=dict(color="#64748b", size=11, family="sans-serif"),
-                )
+        for _lbl in _missing:
+            _fig.add_annotation(
+                x=_xlim / 2,
+                y=_lbl,
+                text="<b>No data in either model</b>",
+                showarrow=False,
+                xanchor="center",
+                font=dict(color="#ffffff", size=12, family="sans-serif"),
+            )
+
+    # All four categories empty — overlay a single chart-spanning banner on
+    # top of the per-row banners so the empty state is unmissable.
+    if not any(_present_flags):
+        _fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            text="<b>No data in either model</b>",
+            showarrow=False,
+            xanchor="center",
+            yanchor="middle",
+            font=dict(color="#ffffff", size=18, family="sans-serif"),
+        )
 
     _fig.update_layout(
         barmode="group",
@@ -779,11 +838,11 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
         ("Subprocess Elements", "subprocess_elemrefs", "subprocess"),
         ("Subprocess Flows", "subprocess_flows", "subprocess"),
     ]
-    _e_data_presence = struct_result.get("_e_data_presence", {})
+    _e_data_presence = struct_result.get("data_presence", {})
     _e_labels, _e_scores, _e_colors, _e_presents = [], [], [], []
     for _e_label, _e_key, _e_category in _e_element_rows:
         _e_present = _e_data_presence.get(_e_key, True)
-        _e_labels.append(_e_label if _e_present else f"{_e_label}  (no data)")
+        _e_labels.append(_e_label)
         _e_scores.append(struct_result.get(_e_key, 0) if _e_present else 0)
         _e_colors.append(CATEGORY_COLORS[_e_category] if _e_present else NO_DATA_COLOR)
         _e_presents.append(_e_present)
@@ -802,24 +861,28 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
         hovertemplate="<b>%{y}</b><br>Raw score: %{x:.3f}<extra></extra>",
     )
 
-    # Grey "no data" full-width band per missing row.
-    for _e_lbl, _e_p in zip(_e_labels, _e_presents):
-        if not _e_p:
-            _fig2.add_bar(
-                orientation="h",
-                y=[_e_lbl],
-                x=[1.1],
-                marker_color=NO_DATA_COLOR,
-                opacity=0.4,
-                showlegend=False,
-                hoverinfo="skip",
-            )
+    # Unified "no data in either model" banner — solid grey row spanning the
+    # full axis with centered bold white text. Same treatment as the
+    # weighted-contributions chart.
+    _e_missing = [lbl for lbl, p in zip(_e_labels, _e_presents) if not p]
+    if _e_missing:
+        _fig2.add_bar(
+            orientation="h",
+            y=_e_missing,
+            x=[1.15] * len(_e_missing),
+            marker_color=NO_DATA_COLOR,
+            opacity=0.6,
+            showlegend=False,
+            hoverinfo="skip",
+        )
+        for _e_lbl in _e_missing:
             _fig2.add_annotation(
-                x=0.55,
+                x=1.15 / 2,
                 y=_e_lbl,
-                text="no data in either model",
+                text="<b>No data in either model</b>",
                 showarrow=False,
-                font=dict(color="#64748b", size=10, family="sans-serif"),
+                xanchor="center",
+                font=dict(color="#ffffff", size=12, family="sans-serif"),
             )
 
     # Manual _e_category legend via invisible scatter traces.
@@ -837,14 +900,6 @@ def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
             name=_e_label,
             showlegend=True,
         )
-    _fig2.add_scatter(
-        x=[None],
-        y=[None],
-        mode="markers",
-        marker=dict(size=10, color=NO_DATA_COLOR),
-        name="No data",
-        showlegend=True,
-    )
 
     _fig2.update_layout(
         height=480,
@@ -966,7 +1021,11 @@ def _extract_traces(
     # defaults — the original ipywidgets dashboard exposed them as sliders
     # but they're rarely touched in practice, and the run-button gate
     # added more friction than it saved.
-    TRACE_TIMEOUT = 5
+    TRACE_TIMEOUT = 15  # seconds; raised from 5 to let the P2P examples
+                        # enumerate their full trace set deterministically
+                        # before the Petri-net explorer's wall-clock budget
+                        # trips. The 20k active-set cap in petri.py is the
+                        # ultimate backstop against pathological models.
     LOOP_DEPTH = 3
 
     tr1 = extract_traces(
