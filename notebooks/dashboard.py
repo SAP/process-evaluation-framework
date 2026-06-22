@@ -87,12 +87,80 @@ def _theme(mo):
         margin: 14px 0;
         box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
-    .pe-card-title {
+    .pe-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
         margin: 0 0 14px 0;
+    }
+    .pe-card-title {
+        margin: 0;
         font-weight: 600;
         font-size: 18px;
         color: #0f172a;
         letter-spacing: -0.01em;
+    }
+    .pe-info {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #94a3b8;
+        background: #f1f5f9;
+        cursor: help;
+        user-select: none;
+        flex: 0 0 auto;
+        transition: color .12s ease, background .12s ease;
+    }
+    .pe-info:hover, .pe-info:focus-within {
+        color: #475569;
+        background: #e2e8f0;
+        outline: none;
+    }
+    .pe-info-bubble {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        width: max-content;
+        max-width: 340px;
+        background: #ffffff;
+        color: #334155;
+        font-size: 12.5px;
+        font-weight: 400;
+        line-height: 1.45;
+        text-align: left;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .12);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-4px);
+        transition: opacity .12s ease, transform .12s ease, visibility 0s linear .12s;
+        pointer-events: none;
+        z-index: 1000;
+        white-space: normal;
+    }
+    .pe-info:hover .pe-info-bubble,
+    .pe-info:focus-within .pe-info-bubble {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        transition: opacity .12s ease, transform .12s ease, visibility 0s linear 0s;
+    }
+    .pe-info-bubble ul { margin: 6px 0 0 0; padding-left: 18px; }
+    .pe-info-bubble li { margin: 2px 0; }
+    .pe-info-bubble code {
+        background: #f1f5f9; border-radius: 4px;
+        padding: 1px 5px; font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     .pe-kpi-row { display: flex; gap: 28px; align-items: flex-end;
         margin: 6px 0 4px 0; }
@@ -136,17 +204,40 @@ def _theme(mo):
     </style>
     """
 
-    def card(title: str, *body) -> "mo.Html":
+    def card(title: str, *body, info: str | None = None) -> "mo.Html":
         """Wrap a sequence of marimo elements in a styled card.
 
         We render the title and the body children inside a single
         ``mo.vstack`` so layout flows naturally; the surrounding card div
         comes from a thin HTML wrapper around the stack's HTML output.
+
+        When ``info`` is provided, render a small "i" icon in the card's
+        top-right corner that reveals the text on hover/focus. Pure CSS,
+        no JS — see ``.pe-info`` / ``.pe-info-bubble`` in ``CARD_CSS``.
+
+        ``info`` is interpolated as raw HTML so callers can embed bullet
+        lists, ``<code>`` snippets, etc. All callsites here are internal /
+        trusted; do not pass user-controlled strings without escaping.
         """
         inner = mo.vstack(list(body), gap=0.6)
+        if info:
+            info_html = (
+                f"<span class='pe-info' tabindex='0' "
+                f"aria-label='About this section'>"
+                f"i"
+                f"<span class='pe-info-bubble' role='tooltip'>"
+                f"{info}"
+                f"</span>"
+                f"</span>"
+            )
+        else:
+            info_html = ""
         return mo.Html(
             f"<div class='pe-card'>"
+            f"<div class='pe-card-header'>"
             f"<div class='pe-card-title'>{title}</div>"
+            f"{info_html}"
+            f"</div>"
             f"{inner.text}"
             f"</div>"
         )
@@ -266,7 +357,14 @@ def _model_pickers(bpmn_options, default_1, default_2, mo):
 
 @app.cell
 def _models_card(card, mo, model1_dd, model2_dd):
-    card("Models", mo.vstack([model1_dd, model2_dd], gap=1))
+    card(
+        "Models",
+        mo.vstack([model1_dd, model2_dd], gap=1),
+        info=(
+            "Pick the two BPMN files to compare. Changing either model "
+            "re-runs every section below."
+        ),
+    )
     return
 
 
@@ -362,8 +460,22 @@ def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
 
     diagrams = mo.vstack(
         [
-            card("Model 1", mo.Html(bpmn_iframe(xml1))),
-            card("Model 2", mo.Html(bpmn_iframe(xml2))),
+            card(
+                "Model 1",
+                mo.Html(bpmn_iframe(xml1)),
+                info=(
+                    "Rendered diagram of the first selected BPMN file "
+                    "(bpmn-js viewer). Scroll to zoom, drag to pan."
+                ),
+            ),
+            card(
+                "Model 2",
+                mo.Html(bpmn_iframe(xml2)),
+                info=(
+                    "Rendered diagram of the second selected BPMN file "
+                    "(bpmn-js viewer). Scroll to zoom, drag to pan."
+                ),
+            ),
         ],
         gap=1,
     )
@@ -406,6 +518,26 @@ def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_ht
                 normalization_summary_html(name_mappings),
             ],
             gap=1,
+        ),
+        info=(
+            "Set-comparison metric and the semantic name-alignment "
+            "threshold. Names from Model 2 with similarity above the "
+            "threshold are aligned to their Model 1 counterpart before "
+            "any set comparison."
+            "<ul>"
+            "<li><strong>Dice</strong>: harmonic-style overlap between "
+            "the two sets.</li>"
+            "<li><strong>Jaccard</strong>: overlap relative to the "
+            "union of both sets.</li>"
+            "<li><strong>Overlap</strong> (Szymkiewicz–Simpson): overlap "
+            "relative to the smaller set.</li>"
+            "<li><strong>Precision</strong>: share of Model 2 items "
+            "that also appear in Model 1.</li>"
+            "<li><strong>Recall</strong>: share of Model 1 items "
+            "recovered by Model 2.</li>"
+            "<li><strong>F1</strong>: harmonic mean of precision and "
+            "recall.</li>"
+            "</ul>"
         ),
     )
     return
@@ -1005,7 +1137,21 @@ def _structural_card(
         "</div>"
     )
     _hero = mo.Html(_hero_html)
-    card("Structural similarity", weights_row, _spacer, charts, _hero)
+    card(
+        "Structural similarity",
+        weights_row,
+        _spacer,
+        charts,
+        _hero,
+        info=(
+            "Compares the static structure of the two models across "
+            "five components (activities, gateways, events, "
+            "pools/lanes, and edges) using the chosen set metric. "
+            "Each component contributes its own similarity score; the "
+            "overall score is a weighted average of these scores, "
+            "with the weights taken from the sliders above."
+        ),
+    )
     return
 
 
@@ -1342,6 +1488,25 @@ def _behavioral_card(
         mo.Html(diagnostics_html),
         fig_behavioral,
         _b_hero,
+        info=(
+            "Compares execution behavior by extracting trace n-grams "
+            "from both models and measuring set overlap. Pick the trace "
+            "kind and the n-gram length:"
+            "<ul>"
+            "<li><strong>1-gram</strong> (unigram) — single activities; "
+            "captures which steps appear at all.</li>"
+            "<li><strong>2-gram</strong> (bigram) — pairs of consecutive "
+            "activities; captures directly-follows relationships.</li>"
+            "<li><strong>3-gram</strong> (trigram) — three consecutive "
+            "activities; captures short ordering patterns.</li>"
+            "<li><strong>4-gram</strong> (tetragram) — four consecutive "
+            "activities; captures medium-range ordering patterns.</li>"
+            "<li><strong>5-gram</strong> (pentagram) — five consecutive "
+            "activities; captures longer ordering patterns.</li>"
+            "</ul>"
+            "The chart shows per-length overlap between both models' "
+            "trace sets."
+        ),
     )
     return
 
@@ -1438,6 +1603,11 @@ def _hybrid_card(
         mo.Html(structural_line),
         mo.Html(behavioral_line),
         _h_hero,
+        info=(
+            "Weighted combination of the structural and behavioral "
+            "scores above. The slider biases the blend toward one or "
+            "the other."
+        ),
     )
     return
 
