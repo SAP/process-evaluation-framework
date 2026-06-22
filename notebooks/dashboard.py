@@ -46,10 +46,16 @@ def _imports():
         calculate_trace_similarity,
     )
     from model_evaluation.BPMN_conversion import XMLBPMNConverter
-    from model_evaluation.rendering.dashboard import CATEGORY_COLORS
     from trace_extraction import extract_ngrams, extract_traces
     from utils.string_similarity import cosine_sim_optimized
 
+    CATEGORY_COLORS = {
+        "elements": "#3498db",        # Blue
+        "flows": "#2ecc71",           # Green
+        "organizational": "#f39c12",  # Orange
+        "subprocess": "#9b59b6",      # Purple
+        "behavioral": "#e74c3c",      # Red
+    }
     NO_DATA_COLOR = "#95a5a6"
     REPO_ROOT = _repo_root
     EXAMPLES_DIR = _repo_root / "examples"
