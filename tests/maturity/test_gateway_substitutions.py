@@ -1,12 +1,13 @@
-"""Gateway-typed BPMN models in the repo's example corpus.
+"""Gateway-typed BPMN models in the maturity suite.
 
-NOTE on what these fixtures actually are: ``Gateway AND.bpmn``,
-``Gateway XOR.bpmn``, and ``Gateway Inclusive.bpmn`` are three different
-T-shirt-order processes that demonstrate the three gateway flavors, NOT
-the same task set with the gateway type swapped. They share the same
-business domain (T-shirt order, Sales pool, the same start/end events)
-but their activity sets differ. The maturity claim we can honestly make
-from them is therefore weaker than "same activities, different gateway":
+NOTE on what these fixtures actually are: ``gateway_and.bpmn``,
+``gateway_xor.bpmn``, and ``gateway_or.bpmn`` (copies of the repo's
+``Gateway AND/XOR/Inclusive.bpmn``) are three different T-shirt-order
+processes that demonstrate the three gateway flavors, NOT the same task
+set with the gateway type swapped. They share the same business domain
+(T-shirt order, Sales pool, the same start/end events) but their
+activity sets differ. The maturity claim we can honestly make from them
+is therefore weaker than "same activities, different gateway":
 
   - all three models load, normalize, and compare without errors
   - their pairwise overall scores land in a sensible band (low-medium,
@@ -28,12 +29,7 @@ from bpmn_similarity import (
 )
 from trace_extraction import extract_traces
 
-from .conftest import EXAMPLES, _load
-
-
-GATEWAY_AND = "Gateway AND.bpmn"
-GATEWAY_XOR = "Gateway XOR.bpmn"
-GATEWAY_OR = "Gateway Inclusive.bpmn"
+from .conftest import GATEWAY_SUBSTITUTIONS, _load
 
 
 def _structural(model_a, model_b):
@@ -49,9 +45,9 @@ def _trace_jaccard(model_a, model_b):
 @pytest.fixture(scope="module")
 def gateway_models():
     return {
-        "and": _load(EXAMPLES / GATEWAY_AND),
-        "xor": _load(EXAMPLES / GATEWAY_XOR),
-        "or": _load(EXAMPLES / GATEWAY_OR),
+        "and": _load(GATEWAY_SUBSTITUTIONS / "gateway_and.bpmn"),
+        "xor": _load(GATEWAY_SUBSTITUTIONS / "gateway_xor.bpmn"),
+        "or": _load(GATEWAY_SUBSTITUTIONS / "gateway_or.bpmn"),
     }
 
 

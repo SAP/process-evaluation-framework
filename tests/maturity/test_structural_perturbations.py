@@ -1,10 +1,15 @@
 """Structural-perturbation pairs.
 
-Tests that small structural edits move the score in the expected direction
-and that the change is detected on the *correct* sub-dimension. Assertions
-are relative — score(perturbed) < score(self) — to avoid pinning brittle
-absolute thresholds. The calibration task will replace these with hard
-floors / ceilings once we've seen the actual distribution.
+All fixtures under ``examples/maturity/structural_perturbations/``:
+
+- ``linear_baseline.bpmn`` / ``linear_reorder.bpmn`` / ``linear_drift.bpmn``
+  — increasingly perturbed linear sequences (copies of repo's ls_1/2/4).
+- ``and_two_branches.bpmn`` / ``and_three_branches.bpmn`` — same shape,
+  one extra parallel branch on the right.
+
+Assertions are relative — score(perturbed) < score(self) — to avoid
+pinning brittle absolute thresholds. The calibration task will replace
+these with hard floors / ceilings once we've seen the actual distribution.
 """
 
 from bpmn_similarity import (
@@ -13,7 +18,7 @@ from bpmn_similarity import (
 )
 from trace_extraction import extract_traces
 
-from .conftest import EXAMPLES, _load
+from .conftest import STRUCTURAL_PERTURBATIONS, _load
 
 
 def _overall(a, b):
@@ -26,28 +31,28 @@ def _trace(a, b):
     return calculate_trace_similarity(res_a, res_b, method="jaccard")
 
 
-def test_ls1_vs_ls2_perturbation_drops_below_self():
-    """ls_1 and ls_2 are perturbations of the same linear-sequence shape.
+def test_linear_baseline_vs_reorder_drops_below_self():
+    """A reordered linear sequence should score below either self-pair."""
+    base = _load(STRUCTURAL_PERTURBATIONS / "linear_baseline.bpmn")
+    reorder = _load(STRUCTURAL_PERTURBATIONS / "linear_reorder.bpmn")
 
-    Whatever exact score the pair lands on, it should be strictly lower
-    than ls_1 vs ls_1 and ls_2 vs ls_2.
-    """
-    ls1 = _load(EXAMPLES / "ls_1.bpmn")
-    ls2 = _load(EXAMPLES / "ls_2.bpmn")
-
-    cross = _overall(ls1, ls2)
-    self1 = _overall(ls1, ls1)
-    self2 = _overall(ls2, ls2)
+    cross = _overall(base, reorder)
+    self_base = _overall(base, base)
+    self_reorder = _overall(reorder, reorder)
 
     assert cross is not None
-    assert cross < self1, f"ls1-vs-ls2 ({cross:.3f}) should be < ls1-self ({self1:.3f})"
-    assert cross < self2, f"ls1-vs-ls2 ({cross:.3f}) should be < ls2-self ({self2:.3f})"
+    assert cross < self_base, (
+        f"baseline-vs-reorder ({cross:.3f}) should be < baseline-self ({self_base:.3f})"
+    )
+    assert cross < self_reorder, (
+        f"baseline-vs-reorder ({cross:.3f}) should be < reorder-self ({self_reorder:.3f})"
+    )
 
 
 def test_branch_added_lowers_score():
     """Adding a third AND-branch should lower the score versus the two-branch baseline."""
-    two_branch = _load(EXAMPLES / "and_gateway_with_join.bpmn")
-    three_branch = _load(EXAMPLES / "and_gateway_three_branches.bpmn")
+    two_branch = _load(STRUCTURAL_PERTURBATIONS / "and_two_branches.bpmn")
+    three_branch = _load(STRUCTURAL_PERTURBATIONS / "and_three_branches.bpmn")
 
     cross = _overall(two_branch, three_branch)
     self_two = _overall(two_branch, two_branch)
@@ -57,28 +62,28 @@ def test_branch_added_lowers_score():
 
 
 def test_perturbation_ranking_monotone_under_drift():
-    """ls_4 is a more-perturbed variant than ls_1, so ls_1 vs ls_4 should
-    score no higher than ls_1 vs ls_2. We assert ≤ rather than < to allow
-    ties from the discrete set-similarity math."""
-    ls1 = _load(EXAMPLES / "ls_1.bpmn")
-    ls2 = _load(EXAMPLES / "ls_2.bpmn")
-    ls4 = _load(EXAMPLES / "ls_4.bpmn")
+    """``linear_drift`` is a more-perturbed variant than ``linear_reorder``,
+    so baseline-vs-drift should score no higher than baseline-vs-reorder.
+    Asserts ≤ rather than < to allow ties from the discrete set-similarity math."""
+    base = _load(STRUCTURAL_PERTURBATIONS / "linear_baseline.bpmn")
+    reorder = _load(STRUCTURAL_PERTURBATIONS / "linear_reorder.bpmn")
+    drift = _load(STRUCTURAL_PERTURBATIONS / "linear_drift.bpmn")
 
-    near = _overall(ls1, ls2)
-    far = _overall(ls1, ls4)
+    near = _overall(base, reorder)
+    far = _overall(base, drift)
     assert near is not None and far is not None
     # Loose direction-of-effect check; calibration may tighten or invert if
-    # ls_2 / ls_4 turn out to be equally perturbed.
+    # the two perturbations turn out equally severe.
     assert far <= near + 0.05, (
-        f"more-perturbed pair (ls1-ls4={far:.3f}) should not score noticeably "
-        f"higher than nearer pair (ls1-ls2={near:.3f})"
+        f"more-perturbed pair (baseline-drift={far:.3f}) should not score "
+        f"noticeably higher than nearer pair (baseline-reorder={near:.3f})"
     )
 
 
 def test_branch_added_changes_trace_behavior():
     """Adding a parallel branch should change the trace set."""
-    two_branch = _load(EXAMPLES / "and_gateway_with_join.bpmn")
-    three_branch = _load(EXAMPLES / "and_gateway_three_branches.bpmn")
+    two_branch = _load(STRUCTURAL_PERTURBATIONS / "and_two_branches.bpmn")
+    three_branch = _load(STRUCTURAL_PERTURBATIONS / "and_three_branches.bpmn")
 
     cross = _trace(two_branch, three_branch)
     # Either jaccard is below 1.0 or the trace sets disagreed enough to

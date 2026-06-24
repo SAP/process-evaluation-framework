@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             id="Definitions_1"
+             targetNamespace="http://example.org/bpmn/maturity"
+             exporter="generate_scalability_models.py"
+             exporterVersion="1.0">
+  <process id="and_4" name="AND N=4" isExecutable="true">
+<startEvent id="start" name="Start">
+  <outgoing>flow_start_to_split</outgoing>
+</startEvent>
+    <parallelGateway id="split" name="AND Split">
+      <incoming>flow_start_to_split</incoming>
+      <outgoing>flow_split_to_task_1</outgoing>
+      <outgoing>flow_split_to_task_2</outgoing>
+      <outgoing>flow_split_to_task_3</outgoing>
+      <outgoing>flow_split_to_task_4</outgoing>
+    </parallelGateway>
+<task id="task_1" name="Task 1">
+  <incoming>flow_split_to_task_1</incoming>
+  <outgoing>flow_task_1_to_join</outgoing>
+</task>
+<task id="task_2" name="Task 2">
+  <incoming>flow_split_to_task_2</incoming>
+  <outgoing>flow_task_2_to_join</outgoing>
+</task>
+<task id="task_3" name="Task 3">
+  <incoming>flow_split_to_task_3</incoming>
+  <outgoing>flow_task_3_to_join</outgoing>
+</task>
+<task id="task_4" name="Task 4">
+  <incoming>flow_split_to_task_4</incoming>
+  <outgoing>flow_task_4_to_join</outgoing>
+</task>
+    <parallelGateway id="join" name="AND Join">
+      <incoming>flow_task_1_to_join</incoming>
+      <incoming>flow_task_2_to_join</incoming>
+      <incoming>flow_task_3_to_join</incoming>
+      <incoming>flow_task_4_to_join</incoming>
+      <outgoing>flow_join_to_end</outgoing>
+    </parallelGateway>
+<endEvent id="end" name="End">
+  <incoming>flow_join_to_end</incoming>
+</endEvent>
+    <sequenceFlow id="flow_start_to_split" sourceRef="start" targetRef="split"/>
+    <sequenceFlow id="flow_split_to_task_1" sourceRef="split" targetRef="task_1"/>
+    <sequenceFlow id="flow_task_1_to_join" sourceRef="task_1" targetRef="join"/>
+    <sequenceFlow id="flow_split_to_task_2" sourceRef="split" targetRef="task_2"/>
+    <sequenceFlow id="flow_task_2_to_join" sourceRef="task_2" targetRef="join"/>
+    <sequenceFlow id="flow_split_to_task_3" sourceRef="split" targetRef="task_3"/>
+    <sequenceFlow id="flow_task_3_to_join" sourceRef="task_3" targetRef="join"/>
+    <sequenceFlow id="flow_split_to_task_4" sourceRef="split" targetRef="task_4"/>
+    <sequenceFlow id="flow_task_4_to_join" sourceRef="task_4" targetRef="join"/>
+    <sequenceFlow id="flow_join_to_end" sourceRef="join" targetRef="end"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="and_4">
+      <bpmndi:BPMNShape id="shape_start" bpmnElement="start">
+        <dc:Bounds x="100" y="182" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_split" bpmnElement="split">
+        <dc:Bounds x="240" y="175" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_1" bpmnElement="task_1">
+        <dc:Bounds x="380" y="10" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_2" bpmnElement="task_2">
+        <dc:Bounds x="380" y="110" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_3" bpmnElement="task_3">
+        <dc:Bounds x="380" y="210" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_4" bpmnElement="task_4">
+        <dc:Bounds x="380" y="310" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_join" bpmnElement="join">
+        <dc:Bounds x="550" y="175" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end" bpmnElement="end">
+        <dc:Bounds x="690" y="182" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_flow_start_to_split" bpmnElement="flow_start_to_split">
+        <di:waypoint x="136" y="200"/>
+        <di:waypoint x="240" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_split_to_task_1" bpmnElement="flow_split_to_task_1">
+        <di:waypoint x="290" y="200"/>
+        <di:waypoint x="380" y="50"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_task_1_to_join" bpmnElement="flow_task_1_to_join">
+        <di:waypoint x="480" y="50"/>
+        <di:waypoint x="550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_split_to_task_2" bpmnElement="flow_split_to_task_2">
+        <di:waypoint x="290" y="200"/>
+        <di:waypoint x="380" y="150"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_task_2_to_join" bpmnElement="flow_task_2_to_join">
+        <di:waypoint x="480" y="150"/>
+        <di:waypoint x="550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_split_to_task_3" bpmnElement="flow_split_to_task_3">
+        <di:waypoint x="290" y="200"/>
+        <di:waypoint x="380" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_task_3_to_join" bpmnElement="flow_task_3_to_join">
+        <di:waypoint x="480" y="250"/>
+        <di:waypoint x="550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_split_to_task_4" bpmnElement="flow_split_to_task_4">
+        <di:waypoint x="290" y="200"/>
+        <di:waypoint x="380" y="350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_task_4_to_join" bpmnElement="flow_task_4_to_join">
+        <di:waypoint x="480" y="350"/>
+        <di:waypoint x="550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_join_to_end" bpmnElement="flow_join_to_end">
+        <di:waypoint x="600" y="200"/>
+        <di:waypoint x="690" y="200"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
