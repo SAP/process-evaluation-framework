@@ -18,7 +18,13 @@ from .conftest import SANITY, _load
 
 
 def test_identical_model_scores_near_one():
-    """A model compared to itself should produce ~1.0 across the board."""
+    """A model compared to itself should produce ~1.0 across the board.
+
+    Calibrated: measured overall = 1.000 across all categories. The 0.95
+    floor leaves room for ID-randomization or hash-ordering drift in the
+    converter without weakening the contract that "identical input →
+    near-perfect score".
+    """
     model = _load(SANITY / "identical_baseline.bpmn")
     result = calculate_bpmn_similarity(model, model, method="dice")
 
@@ -35,15 +41,21 @@ def test_identical_model_scores_near_one():
 
 
 def test_disjoint_models_score_low():
-    """Two unrelated business processes should score low overall."""
+    """Two unrelated business processes should score low overall.
+
+    Calibrated threshold: measured score is ~0.09 for the credit/student
+    pair, so 0.15 gives a healthy margin while still flagging any
+    regression that would let an unrelated process drift into "similar"
+    territory.
+    """
     credit = _load(SANITY / "disjoint_left_credit.bpmn")
     student = _load(SANITY / "disjoint_right_student.bpmn")
 
     result = calculate_bpmn_similarity(credit, student, method="dice")
 
     assert result["overall"] is not None
-    assert result["overall"] <= 0.3, (
-        f"disjoint comparison should be ≤0.3, got {result['overall']:.3f}"
+    assert result["overall"] <= 0.15, (
+        f"disjoint comparison should be ≤0.15, got {result['overall']:.3f}"
     )
 
 
@@ -69,11 +81,14 @@ def test_renamed_only_pair_recovers_under_normalization(embedding_model):
 
     assert raw is not None and norm is not None
     # Direction-of-effect is the strict assertion; the absolute floor on
-    # ``norm`` is loose enough to survive embedding-model drift.
+    # ``norm`` is calibrated to the measured ~1.0 score with a tolerance
+    # for embedding-model drift. The raw score sits around 0.28 because
+    # only element *types* match (the labels diverge), so the ≥0.95
+    # floor cleanly separates "normalizer worked" from "not applied".
     assert norm > raw, (
         f"renamed-only: normalization should lift the score "
         f"(raw={raw:.3f}, normalized={norm:.3f})"
     )
-    assert norm >= 0.7, (
-        f"renamed-only normalized score {norm:.3f} should be ≥0.7"
+    assert norm >= 0.95, (
+        f"renamed-only normalized score {norm:.3f} should be ≥0.95"
     )

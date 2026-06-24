@@ -63,8 +63,13 @@ def test_branch_added_lowers_score():
 
 def test_perturbation_ranking_monotone_under_drift():
     """``linear_drift`` is a more-perturbed variant than ``linear_reorder``,
-    so baseline-vs-drift should score no higher than baseline-vs-reorder.
-    Asserts ≤ rather than < to allow ties from the discrete set-similarity math."""
+    so baseline-vs-drift should score strictly below baseline-vs-reorder.
+
+    Calibrated: measured scores are 0.174 (drift) vs 0.268 (reorder),
+    a 0.094 gap in the correct direction. We assert ``<`` rather than
+    ``≤`` to detect any regression that would put the more-perturbed pair
+    at or above the nearer pair.
+    """
     base = _load(STRUCTURAL_PERTURBATIONS / "linear_baseline.bpmn")
     reorder = _load(STRUCTURAL_PERTURBATIONS / "linear_reorder.bpmn")
     drift = _load(STRUCTURAL_PERTURBATIONS / "linear_drift.bpmn")
@@ -72,11 +77,9 @@ def test_perturbation_ranking_monotone_under_drift():
     near = _overall(base, reorder)
     far = _overall(base, drift)
     assert near is not None and far is not None
-    # Loose direction-of-effect check; calibration may tighten or invert if
-    # the two perturbations turn out equally severe.
-    assert far <= near + 0.05, (
-        f"more-perturbed pair (baseline-drift={far:.3f}) should not score "
-        f"noticeably higher than nearer pair (baseline-reorder={near:.3f})"
+    assert far < near, (
+        f"more-perturbed pair (baseline-drift={far:.3f}) should score "
+        f"strictly below nearer pair (baseline-reorder={near:.3f})"
     )
 
 
