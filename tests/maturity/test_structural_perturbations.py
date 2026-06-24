@@ -65,10 +65,16 @@ def test_perturbation_ranking_monotone_under_drift():
     """``linear_drift`` is a more-perturbed variant than ``linear_reorder``,
     so baseline-vs-drift should score strictly below baseline-vs-reorder.
 
-    Calibrated: measured scores are 0.174 (drift) vs 0.268 (reorder),
-    a 0.094 gap in the correct direction. We assert ``<`` rather than
-    ``≤`` to detect any regression that would put the more-perturbed pair
-    at or above the nearer pair.
+    The matched-vocabulary triplet (baseline / reorder / drift) shares
+    the same four activities — receive / validate / approve / dispatch
+    order — so this asserts that *structural* perturbation alone drives
+    the score. Reorder swaps validate ↔ approve; drift composes that
+    swap with a rework back-edge through an exclusive decision gateway,
+    making it strictly more perturbed.
+
+    Calibrated: baseline-vs-reorder ≈ 0.625; baseline-vs-drift lower
+    than that. We assert ``<`` rather than ``≤`` to detect any regression
+    that would put the more-perturbed pair at or above the nearer pair.
     """
     base = _load(STRUCTURAL_PERTURBATIONS / "linear_baseline.bpmn")
     reorder = _load(STRUCTURAL_PERTURBATIONS / "linear_reorder.bpmn")

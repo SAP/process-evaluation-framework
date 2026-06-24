@@ -9,14 +9,18 @@
              exporter="manual"
              exporterVersion="1.0">
 
-  <process id="process_and_three_branches" name="AND Gateway Three Branches No Join (3 tokens in end)" isExecutable="true">
+  <!-- Clean superset of and_two_branches.bpmn: same Task A + Task B,
+       plus Task C as a third parallel branch. The 3-way parallelGateway
+       join at the end keeps the model sound, so this fixture isolates
+       "branch added" from "soundness change" (degenerate/ covers the
+       unsound-AND case separately). -->
 
-    <!-- Start Event -->
+  <process id="process_and_three_branches" name="AND Gateway Three Branches With Join" isExecutable="true">
+
     <startEvent id="start" name="Start">
       <outgoing>flow_start_to_split</outgoing>
     </startEvent>
 
-    <!-- AND Split Gateway -->
     <parallelGateway id="split" name="AND Split">
       <incoming>flow_start_to_split</incoming>
       <outgoing>flow_split_to_taskA</outgoing>
@@ -24,39 +28,40 @@
       <outgoing>flow_split_to_taskC</outgoing>
     </parallelGateway>
 
-    <!-- Task A -->
     <task id="taskA" name="Task A">
       <incoming>flow_split_to_taskA</incoming>
-      <outgoing>flow_taskA_to_end</outgoing>
+      <outgoing>flow_taskA_to_join</outgoing>
     </task>
 
-    <!-- Task B -->
     <task id="taskB" name="Task B">
       <incoming>flow_split_to_taskB</incoming>
-      <outgoing>flow_taskB_to_end</outgoing>
+      <outgoing>flow_taskB_to_join</outgoing>
     </task>
 
-    <!-- Task C -->
     <task id="taskC" name="Task C">
       <incoming>flow_split_to_taskC</incoming>
-      <outgoing>flow_taskC_to_end</outgoing>
+      <outgoing>flow_taskC_to_join</outgoing>
     </task>
 
-    <!-- End Event (receives 3 tokens - no synchronizing join) -->
+    <parallelGateway id="join" name="AND Join">
+      <incoming>flow_taskA_to_join</incoming>
+      <incoming>flow_taskB_to_join</incoming>
+      <incoming>flow_taskC_to_join</incoming>
+      <outgoing>flow_join_to_end</outgoing>
+    </parallelGateway>
+
     <endEvent id="end" name="End">
-      <incoming>flow_taskA_to_end</incoming>
-      <incoming>flow_taskB_to_end</incoming>
-      <incoming>flow_taskC_to_end</incoming>
+      <incoming>flow_join_to_end</incoming>
     </endEvent>
 
-    <!-- Sequence Flows -->
     <sequenceFlow id="flow_start_to_split" sourceRef="start" targetRef="split"/>
     <sequenceFlow id="flow_split_to_taskA" sourceRef="split" targetRef="taskA"/>
     <sequenceFlow id="flow_split_to_taskB" sourceRef="split" targetRef="taskB"/>
     <sequenceFlow id="flow_split_to_taskC" sourceRef="split" targetRef="taskC"/>
-    <sequenceFlow id="flow_taskA_to_end" sourceRef="taskA" targetRef="end"/>
-    <sequenceFlow id="flow_taskB_to_end" sourceRef="taskB" targetRef="end"/>
-    <sequenceFlow id="flow_taskC_to_end" sourceRef="taskC" targetRef="end"/>
+    <sequenceFlow id="flow_taskA_to_join" sourceRef="taskA" targetRef="join"/>
+    <sequenceFlow id="flow_taskB_to_join" sourceRef="taskB" targetRef="join"/>
+    <sequenceFlow id="flow_taskC_to_join" sourceRef="taskC" targetRef="join"/>
+    <sequenceFlow id="flow_join_to_end" sourceRef="join" targetRef="end"/>
 
   </process>
 
@@ -83,8 +88,12 @@
         <dc:Bounds x="330" y="330" width="100" height="80"/>
       </bpmndi:BPMNShape>
 
+      <bpmndi:BPMNShape id="shape_join" bpmnElement="join">
+        <dc:Bounds x="500" y="223" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
       <bpmndi:BPMNShape id="shape_end" bpmnElement="end">
-        <dc:Bounds x="520" y="230" width="36" height="36"/>
+        <dc:Bounds x="610" y="230" width="36" height="36"/>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNEdge id="edge_flow_start_to_split" bpmnElement="flow_start_to_split">
@@ -109,21 +118,26 @@
         <di:waypoint x="330" y="370"/>
       </bpmndi:BPMNEdge>
 
-      <bpmndi:BPMNEdge id="edge_flow_taskA_to_end" bpmnElement="flow_taskA_to_end">
+      <bpmndi:BPMNEdge id="edge_flow_taskA_to_join" bpmnElement="flow_taskA_to_join">
         <di:waypoint x="430" y="130"/>
-        <di:waypoint x="538" y="130"/>
-        <di:waypoint x="538" y="230"/>
+        <di:waypoint x="525" y="130"/>
+        <di:waypoint x="525" y="223"/>
       </bpmndi:BPMNEdge>
 
-      <bpmndi:BPMNEdge id="edge_flow_taskB_to_end" bpmnElement="flow_taskB_to_end">
+      <bpmndi:BPMNEdge id="edge_flow_taskB_to_join" bpmnElement="flow_taskB_to_join">
         <di:waypoint x="430" y="250"/>
-        <di:waypoint x="520" y="248"/>
+        <di:waypoint x="500" y="248"/>
       </bpmndi:BPMNEdge>
 
-      <bpmndi:BPMNEdge id="edge_flow_taskC_to_end" bpmnElement="flow_taskC_to_end">
+      <bpmndi:BPMNEdge id="edge_flow_taskC_to_join" bpmnElement="flow_taskC_to_join">
         <di:waypoint x="430" y="370"/>
-        <di:waypoint x="538" y="370"/>
-        <di:waypoint x="538" y="266"/>
+        <di:waypoint x="525" y="370"/>
+        <di:waypoint x="525" y="273"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_join_to_end" bpmnElement="flow_join_to_end">
+        <di:waypoint x="550" y="248"/>
+        <di:waypoint x="610" y="248"/>
       </bpmndi:BPMNEdge>
 
     </bpmndi:BPMNPlane>

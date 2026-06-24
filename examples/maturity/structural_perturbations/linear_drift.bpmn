@@ -1,73 +1,139 @@
-<?xml version="1.0" encoding="UTF-8"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" xmlns:signavio="http://www.signavio.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="Signavio Process Editor, http://www.signavio.com" exporterVersion="17.6.1" expressionLanguage="http://www.w3.org/TR/XPath" id="sid-process-ls4" targetNamespace="http://www.signavio.com" typeLanguage="http://www.w3.org/2001/XMLSchema" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
-   <process id="sid-proc-b" isClosed="false" isExecutable="false" processType="None">
-      <startEvent id="b-start" name="b0">
-         <outgoing>b-flow-1</outgoing>
-      </startEvent>
-      <task completionQuantity="1" id="b-task-1" isForCompensation="false" name="b1" startQuantity="1">
-         <incoming>b-flow-1</incoming>
-         <outgoing>b-flow-2</outgoing>
-      </task>
-      <task completionQuantity="1" id="b-task-2" isForCompensation="false" name="b2" startQuantity="1">
-         <incoming>b-flow-2</incoming>
-         <outgoing>b-flow-3</outgoing>
-      </task>
-      <task completionQuantity="1" id="b-task-3" isForCompensation="false" name="b3" startQuantity="1">
-         <incoming>b-flow-3</incoming>
-         <outgoing>b-flow-4</outgoing>
-      </task>
-      <task completionQuantity="1" id="b-task-4" isForCompensation="false" name="b4" startQuantity="1">
-         <incoming>b-flow-4</incoming>
-         <outgoing>b-flow-5</outgoing>
-      </task>
-      <endEvent id="b-end" name="b5">
-         <incoming>b-flow-5</incoming>
-      </endEvent>
-      <sequenceFlow id="b-flow-1" sourceRef="b-start" targetRef="b-task-1"/>
-      <sequenceFlow id="b-flow-2" sourceRef="b-task-1" targetRef="b-task-2"/>
-      <sequenceFlow id="b-flow-3" sourceRef="b-task-2" targetRef="b-task-3"/>
-      <sequenceFlow id="b-flow-4" sourceRef="b-task-3" targetRef="b-task-4"/>
-      <sequenceFlow id="b-flow-5" sourceRef="b-task-4" targetRef="b-end"/>
-   </process>
-   <bpmndi:BPMNDiagram id="b-diagram">
-      <bpmndi:BPMNPlane bpmnElement="sid-proc-b" id="b-plane">
-         <bpmndi:BPMNShape bpmnElement="b-start" id="b-start_gui">
-            <omgdc:Bounds height="30.0" width="30.0" x="270.0" y="550.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNShape bpmnElement="b-task-1" id="b-task-1_gui">
-            <omgdc:Bounds height="80.0" width="100.0" x="345.0" y="525.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNShape bpmnElement="b-task-2" id="b-task-2_gui">
-            <omgdc:Bounds height="80.0" width="100.0" x="490.0" y="525.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNShape bpmnElement="b-task-3" id="b-task-3_gui">
-            <omgdc:Bounds height="80.0" width="100.0" x="635.0" y="525.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNShape bpmnElement="b-task-4" id="b-task-4_gui">
-            <omgdc:Bounds height="80.0" width="100.0" x="780.0" y="525.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNShape bpmnElement="b-end" id="b-end_gui">
-            <omgdc:Bounds height="28.0" width="28.0" x="925.0" y="551.0"/>
-         </bpmndi:BPMNShape>
-         <bpmndi:BPMNEdge bpmnElement="b-flow-1" id="b-flow-1_gui">
-            <omgdi:waypoint x="300.0" y="565.0"/>
-            <omgdi:waypoint x="345.0" y="565.0"/>
-         </bpmndi:BPMNEdge>
-         <bpmndi:BPMNEdge bpmnElement="b-flow-2" id="b-flow-2_gui">
-            <omgdi:waypoint x="445.0" y="565.0"/>
-            <omgdi:waypoint x="490.0" y="565.0"/>
-         </bpmndi:BPMNEdge>
-         <bpmndi:BPMNEdge bpmnElement="b-flow-3" id="b-flow-3_gui">
-            <omgdi:waypoint x="590.0" y="565.0"/>
-            <omgdi:waypoint x="635.0" y="565.0"/>
-         </bpmndi:BPMNEdge>
-         <bpmndi:BPMNEdge bpmnElement="b-flow-4" id="b-flow-4_gui">
-            <omgdi:waypoint x="735.0" y="565.0"/>
-            <omgdi:waypoint x="780.0" y="565.0"/>
-         </bpmndi:BPMNEdge>
-         <bpmndi:BPMNEdge bpmnElement="b-flow-5" id="b-flow-5_gui">
-            <omgdi:waypoint x="880.0" y="565.0"/>
-            <omgdi:waypoint x="925.0" y="565.0"/>
-         </bpmndi:BPMNEdge>
-      </bpmndi:BPMNPlane>
-   </bpmndi:BPMNDiagram>
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             id="Definitions_linear_drift"
+             targetNamespace="http://example.org/bpmn"
+             exporter="manual"
+             exporterVersion="1.0">
+
+  <!-- "Drift" variant: more perturbed than linear_reorder.bpmn. Same 4
+       task vocabulary as the baseline (receive/validate/approve/dispatch
+       order), but combines TWO perturbations:
+         1. The validate ↔ approve swap from linear_reorder, and
+         2. A rework back-edge from "approve order" via an exclusive
+            decision gateway back to "validate order".
+       Strictly more structural change than reorder alone, so the test
+       can assert monotonicity: base-vs-drift < base-vs-reorder. -->
+
+  <process id="process_linear_drift" name="Order Fulfillment (drift = reorder + rework loop)" isExecutable="true">
+
+    <startEvent id="start" name="Start">
+      <outgoing>flow_start_to_receive</outgoing>
+    </startEvent>
+
+    <task id="receive" name="receive order">
+      <incoming>flow_start_to_receive</incoming>
+      <outgoing>flow_receive_to_approve</outgoing>
+    </task>
+
+    <task id="approve" name="approve order">
+      <incoming>flow_receive_to_approve</incoming>
+      <outgoing>flow_approve_to_decision</outgoing>
+    </task>
+
+    <exclusiveGateway id="decision" name="approve OK?">
+      <incoming>flow_approve_to_decision</incoming>
+      <outgoing>flow_decision_to_validate</outgoing>
+      <outgoing>flow_rework_to_validate</outgoing>
+    </exclusiveGateway>
+
+    <task id="validate" name="validate order">
+      <incoming>flow_decision_to_validate</incoming>
+      <incoming>flow_rework_to_validate</incoming>
+      <outgoing>flow_validate_to_dispatch</outgoing>
+    </task>
+
+    <task id="dispatch" name="dispatch order">
+      <incoming>flow_validate_to_dispatch</incoming>
+      <outgoing>flow_dispatch_to_end</outgoing>
+    </task>
+
+    <endEvent id="end" name="End">
+      <incoming>flow_dispatch_to_end</incoming>
+    </endEvent>
+
+    <sequenceFlow id="flow_start_to_receive" sourceRef="start" targetRef="receive"/>
+    <sequenceFlow id="flow_receive_to_approve" sourceRef="receive" targetRef="approve"/>
+    <sequenceFlow id="flow_approve_to_decision" sourceRef="approve" targetRef="decision"/>
+    <sequenceFlow id="flow_decision_to_validate" sourceRef="decision" targetRef="validate" name="forward"/>
+    <sequenceFlow id="flow_rework_to_validate" sourceRef="decision" targetRef="validate" name="rework"/>
+    <sequenceFlow id="flow_validate_to_dispatch" sourceRef="validate" targetRef="dispatch"/>
+    <sequenceFlow id="flow_dispatch_to_end" sourceRef="dispatch" targetRef="end"/>
+
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="process_linear_drift">
+
+      <bpmndi:BPMNShape id="shape_start" bpmnElement="start">
+        <dc:Bounds x="100" y="200" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_receive" bpmnElement="receive">
+        <dc:Bounds x="180" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_approve" bpmnElement="approve">
+        <dc:Bounds x="320" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_decision" bpmnElement="decision">
+        <dc:Bounds x="460" y="193" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_validate" bpmnElement="validate">
+        <dc:Bounds x="560" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_dispatch" bpmnElement="dispatch">
+        <dc:Bounds x="700" y="178" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_end" bpmnElement="end">
+        <dc:Bounds x="840" y="200" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="edge_start_to_receive" bpmnElement="flow_start_to_receive">
+        <di:waypoint x="136" y="218"/>
+        <di:waypoint x="180" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_receive_to_approve" bpmnElement="flow_receive_to_approve">
+        <di:waypoint x="280" y="218"/>
+        <di:waypoint x="320" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_approve_to_decision" bpmnElement="flow_approve_to_decision">
+        <di:waypoint x="420" y="218"/>
+        <di:waypoint x="460" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_decision_to_validate" bpmnElement="flow_decision_to_validate">
+        <di:waypoint x="510" y="218"/>
+        <di:waypoint x="560" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_rework_to_validate" bpmnElement="flow_rework_to_validate">
+        <di:waypoint x="485" y="193"/>
+        <di:waypoint x="485" y="120"/>
+        <di:waypoint x="610" y="120"/>
+        <di:waypoint x="610" y="178"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_validate_to_dispatch" bpmnElement="flow_validate_to_dispatch">
+        <di:waypoint x="660" y="218"/>
+        <di:waypoint x="700" y="218"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_dispatch_to_end" bpmnElement="flow_dispatch_to_end">
+        <di:waypoint x="800" y="218"/>
+        <di:waypoint x="840" y="218"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
 </definitions>
