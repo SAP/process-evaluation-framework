@@ -36,6 +36,12 @@ from .conftest import SANITY, SEMANTIC_NAMING, _load
 # Threshold used by the dashboard's default normalization slider.
 _THRESHOLD = 0.7
 
+# Calibration: measured normalized score for paraphrase and synonym pairs
+# is ~1.0; disjoint normalized stays at ~0.09. A margin of 0.6 above the
+# disjoint baseline is well under the observed gap (~0.9) but still
+# strong enough to be a meaningful contract on the normalizer + scorer.
+_NORM_MARGIN_OVER_DISJOINT = 0.6
+
 
 def _raw_overall(a, b):
     return calculate_bpmn_similarity(a, b, method="dice")["overall"]
@@ -71,9 +77,9 @@ def test_paraphrase_pair_normalizes_above_disjoint_baseline(
     a = _load(SEMANTIC_NAMING / "paraphrase_a.bpmn")
     b = _load(SEMANTIC_NAMING / "paraphrase_b.bpmn")
     norm = _normalized_overall(a, b)
-    assert norm >= disjoint_baseline_overall + 0.3, (
+    assert norm >= disjoint_baseline_overall + _NORM_MARGIN_OVER_DISJOINT, (
         f"paraphrase normalized={norm:.3f} should exceed disjoint baseline "
-        f"({disjoint_baseline_overall:.3f}) by ≥0.3"
+        f"({disjoint_baseline_overall:.3f}) by ≥{_NORM_MARGIN_OVER_DISJOINT}"
     )
 
 
@@ -94,9 +100,9 @@ def test_synonym_pair_normalizes_above_disjoint_baseline(
     a = _load(SEMANTIC_NAMING / "synonym_a.bpmn")
     b = _load(SEMANTIC_NAMING / "synonym_b.bpmn")
     norm = _normalized_overall(a, b)
-    assert norm >= disjoint_baseline_overall + 0.3, (
+    assert norm >= disjoint_baseline_overall + _NORM_MARGIN_OVER_DISJOINT, (
         f"synonym normalized={norm:.3f} should exceed disjoint baseline "
-        f"({disjoint_baseline_overall:.3f}) by ≥0.3"
+        f"({disjoint_baseline_overall:.3f}) by ≥{_NORM_MARGIN_OVER_DISJOINT}"
     )
 
 

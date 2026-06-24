@@ -30,26 +30,38 @@ from .conftest import SANITY, SUBPROCESS_FOLDING, _load
 
 
 def test_flat_vs_subprocess_overall_in_mid_band():
+    """Calibrated: measured overall = 0.500. The expanded subprocess adds
+    subprocess-level elements/flows the flat side lacks, so we never
+    reach 1.0; the activity-name sets overlap so we never sink to the
+    disjoint floor. The [0.4, 0.8] band catches both regressions —
+    drifting up means the subprocess-presence signal is being lost,
+    drifting down means the activity-name overlap is being lost.
+    """
     flat = _load(SUBPROCESS_FOLDING / "flat.bpmn")
     sp = _load(SUBPROCESS_FOLDING / "with_subprocess.bpmn")
     overall = calculate_bpmn_similarity(flat, sp, method="dice")["overall"]
     assert overall is not None
-    assert 0.3 <= overall <= 0.95, (
-        f"flat vs subprocess overall = {overall:.3f}; expected in [0.3, 0.95]"
+    assert 0.4 <= overall <= 0.8, (
+        f"flat vs subprocess overall = {overall:.3f}; expected in [0.4, 0.8]"
     )
 
 
 def test_flat_vs_subprocess_elements_score_remains_high():
     """The activity-name sets agree, so the ``elements`` sub-score should
     sit high even when the aggregated overall is pulled down by the
-    structural difference."""
+    structural difference.
+
+    Calibrated: measured elements = 0.750. Floor of 0.7 leaves a tight
+    margin while still detecting any regression that breaks the
+    label-set overlap.
+    """
     flat = _load(SUBPROCESS_FOLDING / "flat.bpmn")
     sp = _load(SUBPROCESS_FOLDING / "with_subprocess.bpmn")
     result = calculate_bpmn_similarity(flat, sp, method="dice")
     elements = result["high_level_scores"].get("elements")
     assert elements is not None
-    assert elements >= 0.5, (
-        f"elements sub-score = {elements:.3f}; expected ≥0.5 since the "
+    assert elements >= 0.7, (
+        f"elements sub-score = {elements:.3f}; expected ≥0.7 since the "
         f"task-name sets overlap"
     )
 
