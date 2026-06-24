@@ -309,8 +309,11 @@ class PetriNet(BaseModel):
     def get_enabled_transitions(self, marking: Marking) -> Set[Transition]:
         enabled = set()
         for t in self.transitions:
+            # Skip fully-isolated transitions (no preset and no postset).
+            if not t.in_arcs and not t.out_arcs:
+                continue
             if self.is_enabled(t, marking):
-                enabled.add(t) 
+                enabled.add(t)
         return enabled
     
 

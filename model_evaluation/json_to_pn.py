@@ -136,22 +136,30 @@ def parse_simplified_bpmn_json(
         'messageFlows': 'MessageFlow'
     }
 
+    # Collect every flow we want to wire into ``follows``.
+    flow_sources: List[Tuple[str, Any]] = []
     for key, stencil_name in flow_categories.items():
         for flow in simplified_json.get(key, []):
-            fid = f"{model_id_prefix}{flow['id']}"
-            source_id = f"{model_id_prefix}{flow['sourceRef']}"
-            target_id = f"{model_id_prefix}{flow['targetRef']}"
+            flow_sources.append((stencil_name, flow))
+    for activity in simplified_json.get('activities', []):
+        for flow in activity.get('subprocessSequenceFlows', []) or []:
+            flow_sources.append(('SequenceFlow', flow))
 
-            # Register the flow itself in the stencil/label maps
-            bpmn_id_to_stencil[fid] = stencil_name
-            bpmn_id_to_label[fid] = flow.get('name', "") # Flows usually have empty names
+    for stencil_name, flow in flow_sources:
+        fid = f"{model_id_prefix}{flow['id']}"
+        source_id = f"{model_id_prefix}{flow['sourceRef']}"
+        target_id = f"{model_id_prefix}{flow['targetRef']}"
 
-            # Map: Source -> Flow
-            if source_id not in follows:
-                follows[source_id] = []
-            follows[source_id].append(fid)
+        # Register the flow itself in the stencil/label maps
+        bpmn_id_to_stencil[fid] = stencil_name
+        bpmn_id_to_label[fid] = flow.get('name', "") # Flows usually have empty names
 
-            # Map: Flow -> Target
-            follows[fid] = [target_id]
+        # Map: Source -> Flow
+        if source_id not in follows:
+            follows[source_id] = []
+        follows[source_id].append(fid)
+
+        # Map: Flow -> Target
+        follows[fid] = [target_id]
 
     return follows, bpmn_id_to_stencil, bpmn_id_to_label

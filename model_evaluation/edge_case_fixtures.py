@@ -10,28 +10,10 @@ Paste any pair into a notebook cell and run:
     print("high_level_scores:", result["high_level_scores"])
     print("data_presence:", result["data_presence"])
 
-Then to see the dashboard handling:
+To see how the dashboard handles each fixture, launch the marimo
+dashboard and load a pair via its file picker:
 
-    from rendering.dashboard import BPMNSimilarityDashboard
-    from bpmn_normalization import normalize_atomic_names
-    from bpmn_similarity import (
-        calculate_bpmn_similarity,
-        calculate_trace_similarity,
-        calculate_hybrid_similarity,
-    )
-    from trace_extraction import extract_traces
-    from string_similarity import cosine_sim_optimized
-
-    dashboard = BPMNSimilarityDashboard(
-        MODEL_A, MODEL_B,
-        similarity_func=cosine_sim_optimized,
-        calculate_similarity_func=calculate_bpmn_similarity,
-        normalize_func=normalize_atomic_names,
-        extract_traces_func=extract_traces,
-        calculate_trace_similarity_func=calculate_trace_similarity,
-        calculate_hybrid_func=calculate_hybrid_similarity,
-    )
-    dashboard.display()
+    poetry run marimo edit notebooks/dashboard.py
 """
 
 # =============================================================================
