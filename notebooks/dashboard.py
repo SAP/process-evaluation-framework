@@ -135,7 +135,7 @@ def _theme(mo):
         top: calc(100% + 6px);
         right: 0;
         width: max-content;
-        max-width: 340px;
+        max-width: 520px;
         background: #ffffff;
         color: #334155;
         font-size: 12.5px;
@@ -1562,10 +1562,31 @@ def _behavioral_card(
         fig_behavioral,
         _b_hero,
         info=(
-            "Compares execution behavior by extracting trace n-grams "
-            "from both models and measuring set overlap. Pick the trace "
-            "kind and the n-gram length:"
+            "Compares execution behavior by extracting traces from each "
+            "model's Petri-net semantics and measuring set overlap."
+            "<p>Each trace is one feasible end-to-end execution. A "
+            "<strong>loop-depth cap</strong> (pinned at 3) bounds how "
+            "often a trace may re-enter the same marking, so loops in the "
+            "BPMN model contribute finitely many unrolled iterations. "
+            "Traces are classified as:</p>"
             "<ul>"
+            "<li><strong>Complete</strong> — reached the final marking "
+            "cleanly; a real, valid execution of the model.</li>"
+            "<li><strong>Partial</strong> — recorded as a prefix because "
+            "either the loop-depth cap was hit (the trace would unroll a "
+            "4th time) or the explorer reached a deadlock marking (no "
+            "transition enabled, final marking not reached — a soundness "
+            "defect in the model).</li>"
+            "</ul>"
+            "Both kinds feed into the score so loops and soundness issues "
+            "are not silently penalised; the diagnostics line above "
+            "reports the split per model."
+            "<p>Pick the comparison granularity and, for n-grams, the "
+            "length:</p>"
+            "<ul>"
+            "<li><strong>Full Trace</strong> — each end-to-end trace is "
+            "one set element; only models sharing entire variants score "
+            "high.</li>"
             "<li><strong>1-gram</strong> (unigram) — single activities; "
             "captures which steps appear at all.</li>"
             "<li><strong>2-gram</strong> (bigram) — pairs of consecutive "
@@ -1577,8 +1598,10 @@ def _behavioral_card(
             "<li><strong>5-gram</strong> (pentagram) — five consecutive "
             "activities; captures longer ordering patterns.</li>"
             "</ul>"
-            "The chart shows per-length overlap between both models' "
-            "trace sets."
+            "Larger n approaches the strictness of the full-trace view; "
+            "smaller n probes local control flow and tolerates more "
+            "divergence. The chart below shows how the resulting set "
+            "splits between only-Model-1, shared, and only-Model-2."
         ),
     )
     return
