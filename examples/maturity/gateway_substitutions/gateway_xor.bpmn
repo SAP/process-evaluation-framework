@@ -73,7 +73,7 @@
         <dc:Bounds x="180" y="178" width="100" height="80"/>
       </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="shape_split" bpmnElement="split">
+      <bpmndi:BPMNShape id="shape_split" bpmnElement="split" isMarkerVisible="true">
         <dc:Bounds x="330" y="193" width="50" height="50"/>
       </bpmndi:BPMNShape>
 
@@ -85,7 +85,7 @@
         <dc:Bounds x="430" y="260" width="100" height="80"/>
       </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="shape_join" bpmnElement="join">
+      <bpmndi:BPMNShape id="shape_join" bpmnElement="join" isMarkerVisible="true">
         <dc:Bounds x="580" y="193" width="50" height="50"/>
       </bpmndi:BPMNShape>
 

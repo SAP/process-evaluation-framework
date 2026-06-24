@@ -95,21 +95,112 @@ def get_direct_preset_bpmn_ids(
                             break
     return pre_elements
 
+def _build_subprocess_inline_maps(
+    simplified_json: Dict[str, Any], model_id_prefix: str
+) -> Tuple[Dict[str, str], Dict[str, str], Set[str], Set[str]]:
+    """For each expanded subprocess, find its inner start/end events so the
+    outer flow can be re-wired straight into the subprocess body.
+
+    Returns ``(redirect_target, redirect_source, expanded_ids, silent_inner_boundaries)``:
+      - ``redirect_target[subprocess_id]`` → id of the inner start event a
+        flow ``X → subprocess`` should target instead (so the body is entered
+        directly).
+      - ``redirect_source[subprocess_id]`` → id of the inner end event a flow
+        ``subprocess → Y`` should source from instead (so the body's exit
+        flows directly to Y).
+      - ``expanded_ids`` → the set of subprocess activity ids that should be
+        skipped when wiring ``follows``: the outer flows now bypass them.
+      - ``silent_inner_boundaries`` → ids of the inner start/end events for
+        each inlined subprocess. Their labels are blanked out so they act as
+        silent transitions in the resulting Petri net (a flat process and
+        the same process wrapped in an unnamed subprocess then emit the
+        same trace).
+
+    A subprocess is "expanded" when its activity dict has a non-empty
+    ``elemRefs`` list (matching the convention in :mod:`bpmn_sets`). If we
+    can't unambiguously identify an inner start AND inner end inside the
+    subprocess body, we fall back to leaving the subprocess opaque (no
+    redirect entries), so the behavior is the same as before this change.
+    """
+    redirect_target: Dict[str, str] = {}
+    redirect_source: Dict[str, str] = {}
+    expanded_ids: Set[str] = set()
+    silent_inner_boundaries: Set[str] = set()
+
+    events_by_id = {e.get("id", ""): e for e in simplified_json.get("events", [])}
+
+    for activity in simplified_json.get("activities", []):
+        elem_refs = activity.get("elemRefs") or []
+        if not elem_refs:
+            continue
+        sub_id = f"{model_id_prefix}{activity['id']}"
+
+        # Inner sequence flow edges, restricted to refs that name actual
+        # inner elements (defensive — the flow list is the source of truth).
+        inner_flows = activity.get("subprocessSequenceFlows") or []
+        sources = {f.get("sourceRef") for f in inner_flows if f.get("sourceRef")}
+        targets = {f.get("targetRef") for f in inner_flows if f.get("targetRef")}
+        if not sources or not targets:
+            continue  # can't inline a body with no internal flow
+
+        # Pick the inner start (event with no inner predecessor) and inner
+        # end (event with no inner successor). Prefer explicit StartNoneEvent
+        # / EndNoneEvent typing when available; otherwise fall back to the
+        # topological roots.
+        candidates = [r for r in elem_refs if r in sources or r in targets]
+        starts = [
+            r for r in candidates
+            if r not in targets and events_by_id.get(r, {}).get("type", "").lower().startswith("start")
+        ] or [r for r in candidates if r not in targets]
+        ends = [
+            r for r in candidates
+            if r not in sources and events_by_id.get(r, {}).get("type", "").lower().startswith("end")
+        ] or [r for r in candidates if r not in sources]
+
+        if len(starts) != 1 or len(ends) != 1:
+            # Ambiguous body shape (multiple entry/exit points); leave the
+            # subprocess opaque rather than guess which inner element to
+            # bind the outer flow to.
+            continue
+
+        redirect_target[sub_id] = f"{model_id_prefix}{starts[0]}"
+        redirect_source[sub_id] = f"{model_id_prefix}{ends[0]}"
+        expanded_ids.add(sub_id)
+        silent_inner_boundaries.add(f"{model_id_prefix}{starts[0]}")
+        silent_inner_boundaries.add(f"{model_id_prefix}{ends[0]}")
+
+    return redirect_target, redirect_source, expanded_ids, silent_inner_boundaries
+
+
 def parse_simplified_bpmn_json(
-    simplified_json: Dict[str, Any],  
+    simplified_json: Dict[str, Any],
     model_id_prefix: str = ""
 ) -> Tuple[Dict[str, List[str]], Dict[str, str], Dict[str, str]]:
     """
     Parses the simplified BPMN JSON structure into maps compatible with the original logic.
+
+    Expanded subprocesses (activities with ``elemRefs`` and an
+    unambiguous inner start/end) are inlined: outer sequence flows that
+    point at the subprocess transition are redirected to its inner start,
+    and flows leaving the subprocess are sourced from its inner end. The
+    subprocess activity itself is dropped from ``follows`` so the resulting
+    Petri net traverses the body directly instead of treating the
+    subprocess as a single opaque event. Subprocesses whose body shape
+    can't be unambiguously inlined fall back to the previous opaque
+    behavior.
     """
     follows: Dict[str, List[str]] = {}
     bpmn_id_to_stencil: Dict[str, str] = {}
     bpmn_id_to_label: Dict[str, str] = {}
 
+    redirect_target, redirect_source, expanded_ids, silent_inner_boundaries = (
+        _build_subprocess_inline_maps(simplified_json, model_id_prefix)
+    )
+
     # 1. Process Nodes (Activities, Events, Gateways)
     # These are all categorized similarly in the output maps
     node_categories = ['activities', 'events', 'gateways', 'pools']
-    
+
     for category in node_categories:
         for element in simplified_json.get(category, []):
             # Apply prefix for consistency
@@ -118,15 +209,23 @@ def parse_simplified_bpmn_json(
             ename = element.get('name', "")
 
             bpmn_id_to_stencil[eid] = etype
-            
-            # Label fallback logic: use type if name is missing
-            if not ename.strip():
+
+            # Label fallback logic: use type if name is missing. Inner
+            # start/end events of inlined subprocesses are silenced — their
+            # label stays empty so the Petri-net layer treats them as
+            # invisible transitions and a flat process matches the same
+            # process wrapped in an (unnamed) subprocess.
+            if eid in silent_inner_boundaries:
+                bpmn_id_to_label[eid] = ""
+            elif not ename.strip():
                 bpmn_id_to_label[eid] = etype
             else:
                 bpmn_id_to_label[eid] = ename
-            
-            # Initialize the follows entry for this node
-            if eid not in follows:
+
+            # Initialize the follows entry for this node, unless this is an
+            # expanded subprocess we're inlining (its incoming/outgoing flows
+            # are re-pointed at the body instead).
+            if eid not in follows and eid not in expanded_ids:
                 follows[eid] = []
 
     # 2. Process Flows (SequenceFlows, MessageFlows)
@@ -147,8 +246,12 @@ def parse_simplified_bpmn_json(
 
     for stencil_name, flow in flow_sources:
         fid = f"{model_id_prefix}{flow['id']}"
-        source_id = f"{model_id_prefix}{flow['sourceRef']}"
-        target_id = f"{model_id_prefix}{flow['targetRef']}"
+        raw_source = f"{model_id_prefix}{flow['sourceRef']}"
+        raw_target = f"{model_id_prefix}{flow['targetRef']}"
+        # If either endpoint is an inlined subprocess transition, hop over it
+        # to the body's inner end/start respectively.
+        source_id = redirect_source.get(raw_source, raw_source)
+        target_id = redirect_target.get(raw_target, raw_target)
 
         # Register the flow itself in the stencil/label maps
         bpmn_id_to_stencil[fid] = stencil_name

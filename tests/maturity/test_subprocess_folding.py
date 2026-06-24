@@ -12,11 +12,12 @@ What we expect:
 
 - Aggregated structural score: lower than 1.0 because the subprocess
   side adds expanded-subprocess elements (and their internal flows) that
-  the flat side lacks. But the activity *name* sets agree, so the
-  ``elements`` sub-score stays moderately high.
-- Behavioral (trace) score: depends on how the trace extractor handles
-  the subprocess. We don't pin the absolute number; we just check that
-  comparison completes without raising.
+  the flat side lacks. But the activity *name* sets now agree (inner
+  activities flatten into the element-level sets), so the ``elements``
+  sub-score stays high.
+- Behavioral (trace) score: ~1.0 — the trace extractor inlines the
+  expanded subprocess body, so flat and folded variants emit the same
+  trace.
 - The pair should score above pure-disjoint and below identical —
   i.e. land in a "structurally similar but not equal" band.
 """
@@ -30,12 +31,13 @@ from .conftest import SANITY, SUBPROCESS_FOLDING, _load
 
 
 def test_flat_vs_subprocess_overall_in_mid_band():
-    """Calibrated: measured overall = 0.500. The expanded subprocess adds
-    subprocess-level elements/flows the flat side lacks, so we never
-    reach 1.0; the activity-name sets overlap so we never sink to the
-    disjoint floor. The [0.4, 0.8] band catches both regressions —
-    drifting up means the subprocess-presence signal is being lost,
-    drifting down means the activity-name overlap is being lost.
+    """Calibrated: measured overall ≈ 0.51. The expanded subprocess adds
+    subprocess-scoped elements and flows the flat side lacks, so we
+    never reach 1.0; activity names now flatten across the subprocess
+    boundary so the floor stays well above disjoint. The [0.4, 0.8] band
+    catches both regressions — drifting up means the subprocess-presence
+    signal is being lost, drifting down means the activity-name overlap
+    is being lost.
     """
     flat = _load(SUBPROCESS_FOLDING / "flat.bpmn")
     sp = _load(SUBPROCESS_FOLDING / "with_subprocess.bpmn")
@@ -47,11 +49,11 @@ def test_flat_vs_subprocess_overall_in_mid_band():
 
 
 def test_flat_vs_subprocess_elements_score_remains_high():
-    """The activity-name sets agree, so the ``elements`` sub-score should
-    sit high even when the aggregated overall is pulled down by the
-    structural difference.
+    """The activity-name sets agree across the subprocess boundary, so
+    the ``elements`` sub-score should sit high even when the aggregated
+    overall is pulled down by the subprocess-scoped structural keys.
 
-    Calibrated: measured elements = 0.750. Floor of 0.7 leaves a tight
+    Calibrated: measured elements ≈ 0.79. Floor of 0.7 leaves a tight
     margin while still detecting any regression that breaks the
     label-set overlap.
     """
@@ -79,16 +81,24 @@ def test_flat_vs_subprocess_scores_above_disjoint_baseline():
     )
 
 
-def test_flat_vs_subprocess_trace_extraction_finite():
+def test_flat_vs_subprocess_traces_match_after_inlining():
+    """The Petri-net layer inlines the expanded subprocess body and
+    silences the inner start/end events, so the two models emit the same
+    trace and the behavioral score should round to 1.0. We allow a small
+    floor to absorb extractor-internal ordering noise on richer fixtures
+    in the future, but for this pair the trace sets are literally equal.
+    """
     flat = _load(SUBPROCESS_FOLDING / "flat.bpmn")
     sp = _load(SUBPROCESS_FOLDING / "with_subprocess.bpmn")
     res_flat = extract_traces(flat, timeout_seconds=3.0, max_loop_depth=3)
     res_sp = extract_traces(sp, timeout_seconds=3.0, max_loop_depth=3)
     score = calculate_trace_similarity(res_flat, res_sp, method="jaccard")
-    # Trace extraction over a subprocess may legitimately return 0 or
-    # None depending on how subprocess delimiters surface in the trace
-    # tuples — we only require that no NaN/Inf leaks through.
-    assert score is None or (0.0 <= score <= 1.0 and math.isfinite(score))
+    assert score is not None, "behavioral similarity should be defined"
+    assert math.isfinite(score)
+    assert score >= 0.99, (
+        f"flat vs subprocess behavioral similarity = {score:.3f}; "
+        f"expected ≈1.0 after subprocess inlining"
+    )
 
 
 def test_subprocess_model_has_expanded_subprocess_flag():
