@@ -25,8 +25,7 @@ model_evaluation/
 │   ├── string_similarity.py    # BERT-based semantic similarity
 │   └── list_similarity.py      # Set comparison metrics (Dice, Jaccard, etc.)
 ├── rendering/                  # Visualization modules
-│   ├── bpmn_viewer.py          # BPMN XML viewer using bpmn-js
-│   └── dashboard.py            # Interactive similarity dashboard
+│   └── bpmn_viewer.py          # BPMN XML viewer using bpmn-js
 ├── BPMN_conversion.py          # Signavio JSON and XML 2.0 → minimal BPMN converter
 ├── bpmn_normalization.py       # Semantic name alignment
 ├── bpmn_sets.py                # Element set extraction
@@ -39,10 +38,21 @@ model_evaluation/
 
 
 notebooks/
+├── dashboard.py                # Interactive similarity dashboard (marimo)
 └── model_eval_code_usage.ipynb # Usage examples and demonstrations
 
 examples/                       # Sample BPMN models for testing
 ```
+
+## Running the dashboard
+
+The interactive similarity dashboard is a [marimo](https://marimo.io) notebook. Launch it from the repo root:
+
+```
+poetry run marimo edit notebooks/dashboard.py
+```
+
+It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view. Use `marimo run` instead of `edit` for a read-only app view.
 
 ## Requirements and Setup
 
