@@ -47,10 +47,33 @@ def test_disjoint_models_score_low():
     )
 
 
-@pytest.mark.skip(reason="renamed-only pair authored in the 'new models' task")
-def test_renamed_only_pair_high_structural_low_naming():
-    """Placeholder — same structure, renamed elements.
+def test_renamed_only_pair_recovers_under_normalization(embedding_model):
+    """Same 3-task linear shape, second model uses different (but
+    semantically equivalent) labels. Raw similarity is modest because the
+    activity-name sets disagree; after ``normalize_atomic_names`` aligns
+    model_b's vocabulary to model_a's, the score should jump close to 1.0.
 
-    Will be wired up against ``examples/maturity/sanity/renamed_only_*``
-    once those models exist (task #3).
+    This is the canonical maturity claim of the framework: an authored
+    rename should not look "disjoint" once you let the semantic
+    normalizer line up the labels.
     """
+    from bpmn_normalization import normalize_atomic_names
+    from utils.string_similarity import cosine_sim_optimized
+
+    a = _load(SANITY / "renamed_only_a.bpmn")
+    b = _load(SANITY / "renamed_only_b.bpmn")
+
+    raw = calculate_bpmn_similarity(a, b, method="dice")["overall"]
+    aligned, _ = normalize_atomic_names(a, b, cosine_sim_optimized, threshold=0.7)
+    norm = calculate_bpmn_similarity(a, aligned, method="dice")["overall"]
+
+    assert raw is not None and norm is not None
+    # Direction-of-effect is the strict assertion; the absolute floor on
+    # ``norm`` is loose enough to survive embedding-model drift.
+    assert norm > raw, (
+        f"renamed-only: normalization should lift the score "
+        f"(raw={raw:.3f}, normalized={norm:.3f})"
+    )
+    assert norm >= 0.7, (
+        f"renamed-only normalized score {norm:.3f} should be ≥0.7"
+    )
