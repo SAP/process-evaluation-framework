@@ -49,10 +49,8 @@ AXIS_Y = 200
 
 
 # ---------------------------------------------------------------------------
-# XML emission helpers (intentionally duplicated from
-# generate_scalability_models.py rather than imported — both scripts are
-# tiny and self-contained, so a future edit to one shouldn't affect the
-# other).
+# XML emission helpers — kept inline so this script stays self-contained
+# and can be rerun without depending on other generator modules.
 # ---------------------------------------------------------------------------
 
 _HEADER = dedent(
