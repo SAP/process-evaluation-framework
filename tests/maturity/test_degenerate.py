@@ -2,7 +2,7 @@
 
 The "empty" and "single-task" cases are deferred to task #3 (new models).
 This file pins the unsound-net handling that already ships: comparing
-``and_gateway_no_join.bpmn`` (no join, AND-split deadlocks) against a
+``unsound_and_no_join.bpmn`` (no join, AND-split deadlocks) against the
 sound counterpart MUST return a finite score rather than raise.
 
 The behavior itself is covered in detail by
@@ -21,12 +21,12 @@ from bpmn_similarity import (
 )
 from trace_extraction import extract_traces
 
-from .conftest import EXAMPLES, _load
+from .conftest import DEGENERATE, _load
 
 
 def test_unsound_vs_sound_returns_finite_score():
-    unsound = _load(EXAMPLES / "and_gateway_no_join.bpmn")
-    sound = _load(EXAMPLES / "and_gateway_with_join.bpmn")
+    unsound = _load(DEGENERATE / "unsound_and_no_join.bpmn")
+    sound = _load(DEGENERATE / "sound_and_with_join.bpmn")
 
     structural = calculate_bpmn_similarity(unsound, sound, method="dice")
     assert structural["overall"] is not None

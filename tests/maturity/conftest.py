@@ -33,7 +33,17 @@ for _path in (str(_ROOT), str(_MODEL_EVAL)):
 from BPMN_conversion import BPMNConverter, XMLBPMNConverter  # noqa: E402
 
 
+# All maturity fixtures live under examples/maturity/<category>/. Category
+# constants are exposed so individual test files don't have to repeat the
+# path joining (and so a folder rename touches one line).
 EXAMPLES = _ROOT / "examples"
+MATURITY = EXAMPLES / "maturity"
+SANITY = MATURITY / "sanity"
+GATEWAY_SUBSTITUTIONS = MATURITY / "gateway_substitutions"
+STRUCTURAL_PERTURBATIONS = MATURITY / "structural_perturbations"
+FORMAT_ROUND_TRIP = MATURITY / "format_round_trip"
+DEGENERATE = MATURITY / "degenerate"
+SCALABILITY = MATURITY / "scalability"
 
 
 def _load(path: Path):

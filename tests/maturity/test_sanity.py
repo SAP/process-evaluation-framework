@@ -1,6 +1,6 @@
 """Sanity / boundary cases for the maturity suite.
 
-Three cases:
+Three cases (all fixtures under ``examples/maturity/sanity/``):
 
 - ``identical``  — model compared to itself; every sub-score ≥ 0.95.
 - ``disjoint``   — two completely unrelated models; overall ≤ 0.3.
@@ -14,12 +14,12 @@ import pytest
 
 from bpmn_similarity import calculate_bpmn_similarity
 
-from .conftest import EXAMPLES, _load
+from .conftest import SANITY, _load
 
 
 def test_identical_model_scores_near_one():
     """A model compared to itself should produce ~1.0 across the board."""
-    model = _load(EXAMPLES / "linear_sequence.bpmn")
+    model = _load(SANITY / "identical_baseline.bpmn")
     result = calculate_bpmn_similarity(model, model, method="dice")
 
     assert result["overall"] is not None
@@ -36,8 +36,8 @@ def test_identical_model_scores_near_one():
 
 def test_disjoint_models_score_low():
     """Two unrelated business processes should score low overall."""
-    credit = _load(EXAMPLES / "credit.bpmn")
-    student = _load(EXAMPLES / "student_project.bpmn")
+    credit = _load(SANITY / "disjoint_left_credit.bpmn")
+    student = _load(SANITY / "disjoint_right_student.bpmn")
 
     result = calculate_bpmn_similarity(credit, student, method="dice")
 

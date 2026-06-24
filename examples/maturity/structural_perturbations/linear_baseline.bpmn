@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" xmlns:signavio="http://www.signavio.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="Signavio Process Editor, http://www.signavio.com" exporterVersion="17.6.1" expressionLanguage="http://www.w3.org/TR/XPath" id="sid-88ae5102-6e90-47fc-933d-785bf2c61001" targetNamespace="http://www.signavio.com" typeLanguage="http://www.w3.org/2001/XMLSchema" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
+   <process id="sid-a9958064-c611-4ce5-9c83-67d8cd3f0001" isClosed="false" isExecutable="false" processType="None">
+      <startEvent id="sid-START-0001" name="Start">
+         <outgoing>sid-FLOW-0001</outgoing>
+      </startEvent>
+      <task completionQuantity="1" id="sid-TASK-0001" isForCompensation="false" name="register invoice" startQuantity="1">
+         <incoming>sid-FLOW-0001</incoming>
+         <outgoing>sid-FLOW-0002</outgoing>
+      </task>
+      <task completionQuantity="1" id="sid-TASK-0002" isForCompensation="false" name="accept invoice" startQuantity="1">
+         <incoming>sid-FLOW-0002</incoming>
+         <outgoing>sid-FLOW-0003</outgoing>
+      </task>
+      <task completionQuantity="1" id="sid-TASK-0003" isForCompensation="false" name="process payment" startQuantity="1">
+         <incoming>sid-FLOW-0003</incoming>
+         <outgoing>sid-FLOW-0004</outgoing>
+      </task>
+      <endEvent id="sid-END-0001" name="End">
+         <incoming>sid-FLOW-0004</incoming>
+      </endEvent>
+      <sequenceFlow id="sid-FLOW-0001" sourceRef="sid-START-0001" targetRef="sid-TASK-0001"/>
+      <sequenceFlow id="sid-FLOW-0002" sourceRef="sid-TASK-0001" targetRef="sid-TASK-0002"/>
+      <sequenceFlow id="sid-FLOW-0003" sourceRef="sid-TASK-0002" targetRef="sid-TASK-0003"/>
+      <sequenceFlow id="sid-FLOW-0004" sourceRef="sid-TASK-0003" targetRef="sid-END-0001"/>
+   </process>
+   <bpmndi:BPMNDiagram id="sid-diagram-0001">
+      <bpmndi:BPMNPlane bpmnElement="sid-a9958064-c611-4ce5-9c83-67d8cd3f0001" id="sid-plane-0001">
+         <bpmndi:BPMNShape bpmnElement="sid-START-0001" id="sid-START-0001_gui">
+            <omgdc:Bounds height="30.0" width="30.0" x="270.0" y="550.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0001" id="sid-TASK-0001_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="345.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0002" id="sid-TASK-0002_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="490.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-TASK-0003" id="sid-TASK-0003_gui">
+            <omgdc:Bounds height="80.0" width="100.0" x="635.0" y="525.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNShape bpmnElement="sid-END-0001" id="sid-END-0001_gui">
+            <omgdc:Bounds height="28.0" width="28.0" x="780.0" y="551.0"/>
+         </bpmndi:BPMNShape>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0001" id="sid-FLOW-0001_gui">
+            <omgdi:waypoint x="300.0" y="565.0"/>
+            <omgdi:waypoint x="345.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0002" id="sid-FLOW-0002_gui">
+            <omgdi:waypoint x="445.0" y="565.0"/>
+            <omgdi:waypoint x="490.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0003" id="sid-FLOW-0003_gui">
+            <omgdi:waypoint x="590.0" y="565.0"/>
+            <omgdi:waypoint x="635.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+         <bpmndi:BPMNEdge bpmnElement="sid-FLOW-0004" id="sid-FLOW-0004_gui">
+            <omgdi:waypoint x="735.0" y="565.0"/>
+            <omgdi:waypoint x="780.0" y="565.0"/>
+         </bpmndi:BPMNEdge>
+      </bpmndi:BPMNPlane>
+   </bpmndi:BPMNDiagram>
+</definitions>

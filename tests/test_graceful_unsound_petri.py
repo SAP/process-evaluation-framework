@@ -18,8 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from BPMN_conversion import BPMNConverter
-from XML_conversion import XMLBPMNConverter
+from BPMN_conversion import BPMNConverter, XMLBPMNConverter
 from petri import (
     DeadlockSignature,
     ExplorationDiagnostics,
