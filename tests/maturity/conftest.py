@@ -45,7 +45,6 @@ SEMANTIC_NAMING = MATURITY / "semantic_naming"
 SUBPROCESS_FOLDING = MATURITY / "subprocess_folding"
 FORMAT_ROUND_TRIP = MATURITY / "format_round_trip"
 DEGENERATE = MATURITY / "degenerate"
-SCALABILITY = MATURITY / "scalability"
 
 
 def _load(path: Path):

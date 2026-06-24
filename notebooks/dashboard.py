@@ -353,14 +353,14 @@ def _intro(mo):
 @app.cell
 def _bpmn_options(EXAMPLES_DIR):
     # Recursive scan of examples/ for .bpmn files. Display labels are
-    # relative to examples/ so nested folders (e.g. testing_models/...) are
+    # relative to examples/ so nested folders (e.g. maturity/...) are
     # visible in the dropdown.
     paths = sorted(EXAMPLES_DIR.rglob("*.bpmn"))
     bpmn_options = {str(p.relative_to(EXAMPLES_DIR)): str(p) for p in paths}
 
     # Defaults: the P2P pair if present, otherwise the first two entries.
-    _preferred_1 = "testing_models/P2P - Running Example.bpmn"
-    _preferred_2 = "testing_models/P2P - Variant Running Example.bpmn"
+    _preferred_1 = "P2P - Running Example.bpmn"
+    _preferred_2 = "P2P - Variant Running Example.bpmn"
     _keys = list(bpmn_options.keys())
     default_1 = _preferred_1 if _preferred_1 in bpmn_options else (_keys[0] if _keys else None)
     default_2 = _preferred_2 if _preferred_2 in bpmn_options else (_keys[1] if len(_keys) > 1 else default_1)

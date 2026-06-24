@@ -7,7 +7,7 @@ specific, named behaviors — so reviewers can spot-check the claim that
 "the tool behaves as advertised" without re-running the dashboard.
 
 **Layout** — one folder per behavior; one runnable test file per folder
-(under `tests/maturity/`). 18 distinct pairings, 48 tests, 0 skipped.
+(under `tests/maturity/`).
 
 ```
 sanity/                      identical / disjoint / renamed-only
@@ -17,26 +17,22 @@ semantic_naming/             paraphrase / synonym (relies on the normalizer)
 subprocess_folding/          flat vs expanded subprocess
 format_round_trip/           BPMN XML vs Signavio JSON
 degenerate/                  empty, single-task, unsound nets
-scalability/                 generated linear chains + AND-fan-outs
 ```
 
 **Run everything** (from repo root):
 
 ```bash
-poetry run pytest tests/maturity/                  # default suite, ~15s
-poetry run pytest tests/maturity/ -m slow          # scalability benchmarks, ~12s
-poetry run jupyter notebook notebooks/maturity_report.ipynb   # interactive report
+poetry run pytest tests/maturity/                              # full correctness suite
+poetry run jupyter notebook notebooks/maturity_report.ipynb    # interactive report
 ```
 
 The notebook `notebooks/maturity_report.ipynb` is the one-stop runner:
-section 1 regenerates the BPMN fixtures, section 2 runs the scalability
-benchmark and prints the wall-clock numbers for the paper, and section 3
-dumps every edge-case pair's actual sub-scores. Open it in Jupyter or
-VS Code and run-all; the whole thing completes in about 30 s. The
-generation logic still lives as importable modules under
-`scripts/maturity/` so the same builders are reused — the BPMN files are
-committed for reproducibility, but every one of them is one cell away
-from being rebuilt from scratch.
+section 1 regenerates the BPMN fixtures, and section 2 dumps every
+edge-case pair's actual sub-scores for threshold calibration. The
+generation logic lives as an importable module under
+`scripts/maturity/generate_small_models.py` so the same builders are
+reused — the BPMN files are committed for reproducibility, but every
+one of them is one cell away from being rebuilt from scratch.
 
 ---
 
@@ -159,47 +155,6 @@ Tests: `test_empty_model_self_comparison_is_finite_and_safe`,
 `test_empty_vs_single_task_returns_finite_score`,
 `test_unsound_vs_sound_returns_finite_score`.
 
-### 8. Scalability — `scalability/`
-
-13 generated fixtures across two shapes:
-
-- **Linear chains** `linear_N.bpmn` for `N ∈ {5, 10, 20, 50, 100, 200}`.
-  Element count grows linearly, trace count stays at 1. Stresses
-  loading, set construction, and normalization but not behavioral
-  exploration. Wall-clock at `N=200`: **~0.13 s** end-to-end.
-
-- **Parallel AND splits** `and_N.bpmn` for `N ∈ {2..8}`. Element
-  count grows linearly, but trace variants grow factorially (`N!`).
-  Wall-clock at `N=8`: **~2.5 s** for 27,309 variants (active-set cap
-  truncates from the theoretical 40,320 — surfacing the limit
-  honestly is the *point* of the benchmark).
-
-Each model is also self-compared via the full pipeline as a
-@pytest.mark.slow check that the run completes within a generous wall-clock
-budget (linear ≤ 30 s, AND ≤ 120 s). The real numbers for the paper
-come from `notebooks/maturity_report.ipynb` (section 2).
-
-Regenerate via section 1 of the notebook, or directly:
-`poetry run python -c "from scripts.maturity.generate_scalability_models import emit_all, OUTPUT_DIR; emit_all(OUTPUT_DIR)"`.
-
----
-
-## Scalability headlines (for the paper)
-
-| Shape | Largest tested | Wall-clock | Variants |
-|---|---|---|---|
-| Linear chain | N = 200 | ~0.13 s | 1 |
-| Linear chain | N = 100 | ~0.03 s | 1 |
-| Linear chain | N = 50  | ~0.01 s | 1 |
-| Parallel AND | N = 7   | ~0.38 s | 5,040 |
-| Parallel AND | N = 8   | ~2.48 s | 27,309 (capped from 40,320) |
-
-Numbers are measured on the author's machine and reproducible via
-`notebooks/maturity_report.ipynb`. The AND series intentionally
-surfaces the factorial trace-variant wall — it's the cost side of the
-behavioral-fidelity / cost trade-off baked into trace-based
-similarity.
-
 ---
 
 ## Limitations
@@ -210,13 +165,3 @@ observed distribution of the current converter, normalizer, and
 embedding model; correlation with expert judgments of "how similar"
 two business processes are is left for future work, alongside a larger
 public-corpus quantitative analysis.
-
----
-
-## SAP-internal case studies
-
-The framework has additionally been applied to SAP-internal process
-models — see the SiSe (Sales-Side) Phase 1 Contract Booking running
-example and the P2P (Procure-to-Pay) running example under
-`examples/testing_models/`. The models themselves are not shareable;
-case-study details and findings are available on request.

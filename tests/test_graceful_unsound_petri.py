@@ -36,7 +36,7 @@ from trace_extraction import (
 from bpmn_similarity import calculate_trace_similarity
 
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "old_models"
 
 
 # ---------------------------------------------------------------------------
