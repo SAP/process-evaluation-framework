@@ -11,7 +11,7 @@ specific, named behaviors — so reviewers can spot-check the claim that
 
 ```
 sanity/                      identical / disjoint / renamed-only
-gateway_substitutions/       AND vs XOR vs OR
+gateway_substitutions/       AND vs XOR vs OR (matched triplet)
 structural_perturbations/    reorder / branch added / drift
 semantic_naming/             paraphrase / synonym (relies on the normalizer)
 subprocess_folding/          flat vs expanded subprocess
@@ -26,13 +26,10 @@ poetry run pytest tests/maturity/                              # full correctnes
 poetry run jupyter notebook notebooks/maturity_report.ipynb    # interactive report
 ```
 
-The notebook `notebooks/maturity_report.ipynb` is the one-stop runner:
-section 1 regenerates the BPMN fixtures, and section 2 dumps every
-edge-case pair's actual sub-scores for threshold calibration. The
-generation logic lives as an importable module under
-`scripts/maturity/generate_small_models.py` so the same builders are
-reused — the BPMN files are committed for reproducibility, but every
-one of them is one cell away from being rebuilt from scratch.
+The notebook `notebooks/maturity_report.ipynb` dumps every edge-case
+pair's actual sub-scores — useful for threshold calibration and for
+quoting the right numbers in prose. The fixtures themselves are
+plain BPMN files, edited directly under each folder.
 
 ---
 
@@ -46,28 +43,33 @@ obvious cases.
 | File pair | Expected behavior | Test |
 |---|---|---|
 | `identical_baseline.bpmn` × self | All sub-scores ≥ 0.95; aggregated near 1.0. | `test_identical_model_scores_near_one` |
-| `disjoint_left_credit.bpmn` × `disjoint_right_student.bpmn` | Aggregated ≤ 0.15 — two unrelated business processes. | `test_disjoint_models_score_low` |
+| `disjoint_left_credit.bpmn` × `disjoint_right_student.bpmn` | Aggregated ≤ 0.15 — a credit-approval process versus a student-enrollment process; no shared vocabulary, no shared structure. | `test_disjoint_models_score_low` |
 | `renamed_only_a.bpmn` × `renamed_only_b.bpmn` | Same 3-task linear shape, different label strings. Raw similarity is modest (~0.28); after `normalize_atomic_names` aligns the vocabularies, the score lifts to ~1.0. This is *the* canonical maturity claim of the tool. | `test_renamed_only_pair_recovers_under_normalization` |
+
+`identical_baseline.bpmn`, `semantic_naming/paraphrase_a.bpmn`,
+`semantic_naming/synonym_a.bpmn`, and `sanity/renamed_only_a.bpmn` all
+share the same canonical 3-task model (`Book flight → Pay → Confirm`)
+so every `_b` variant can be diffed against a single reference.
 
 ### 2. Gateway substitutions — `gateway_substitutions/`
 
-Three different T-shirt-order processes that demonstrate the three
-gateway flavors (AND, XOR, OR). They share a domain but **not** a
-task set, which is why the cross-pair scores land in a banded
-middle ground rather than at "near identical".
+A matched triplet: same four activities (`Receive Customer Order`,
+`Prepare Order`, `Prepare Invoice`, `Ship Order with Invoice`), same
+start/split/join/end skeleton — only the gateway type at the split and
+join differs.
 
-| File | Source process |
+| File | Gateway type |
 |---|---|
-| `gateway_and.bpmn` | Parallel order processing |
-| `gateway_xor.bpmn` | Discount-eligibility branching |
-| `gateway_or.bpmn` | Inclusive prepare-and-ship |
+| `gateway_and.bpmn` | parallelGateway (AND) split + AND join |
+| `gateway_xor.bpmn` | exclusiveGateway (XOR) split + XOR join |
+| `gateway_or.bpmn`  | inclusiveGateway (OR) split + OR join |
 
-Expected: each model has self-similarity exactly 1.0; cross-pair overall
-scores fall in `[0.1, 0.9]`; trace similarity is strictly below
-self-similarity for every cross-pair; OR yields ≥ 1 variant in
-extraction. A properly-aligned (same-tasks-different-gateway) triplet is
-left as future work — the loose band reflects what these particular
-fixtures honestly support.
+Expected: self-similarity is exactly 1.0; cross-pair overall lands
+in `[0.3, 0.9]` (measured 0.406 for all three pairs — same activities
+and edges, only the gateway type disagrees); cross-pair trace
+similarity is at-or-below self (AND vs {XOR, OR} = 0.000 because AND
+demands both branches fire; XOR vs OR can legitimately equal 1.000
+under the activity-set trace projection); OR yields ≥ 1 variant.
 
 Tests: `test_gateway_model_self_similarity_is_one`,
 `test_cross_gateway_pair_in_shared_domain_band`,
@@ -76,8 +78,27 @@ Tests: `test_gateway_model_self_similarity_is_one`,
 
 ### 3. Structural perturbations — `structural_perturbations/`
 
-Linear-sequence and parallel-AND perturbation series. The contract is
-about **direction of effect**, not absolute magnitude.
+Linear-sequence and parallel-AND perturbation series, all sharing one
+vocabulary so the test isolates structure from naming.
+
+The linear series uses the same four tasks across all three fixtures —
+`receive order`, `validate order`, `approve order`, `dispatch order` —
+varying only the flow:
+
+- `linear_baseline.bpmn`: canonical sequence.
+- `linear_reorder.bpmn`: `validate` ↔ `approve` swapped in execution
+  order. Same tasks, same edges-count, only target refs differ.
+- `linear_drift.bpmn`: composes the reorder swap with a rework
+  back-edge from `approve order` through an exclusive decision
+  gateway back to `validate order` — strictly more perturbed than
+  reorder alone.
+
+The AND series:
+
+- `and_two_branches.bpmn`: parallel split → {Task A, Task B} → join.
+- `and_three_branches.bpmn`: clean superset — adds Task C as a third
+  parallel branch with a 3-way `parallelGateway` join so the model
+  stays sound. (The `degenerate/` folder covers the unsound-AND case.)
 
 | File pair | Expected behavior | Test |
 |---|---|---|
