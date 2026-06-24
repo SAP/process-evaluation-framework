@@ -2,9 +2,11 @@
 
 Three cases (all fixtures under ``examples/maturity/sanity/``):
 
-- ``identical``  — model compared to itself; every sub-score ≥ 0.95.
-- ``disjoint``   — two completely unrelated models; overall ≤ 0.3.
-- ``renamed_only`` — covered by the new-models task; placeholder skip here.
+- ``identical``     — model compared to itself; every sub-score ≥ 0.95.
+- ``disjoint``      — two completely unrelated models; overall ≤ 0.15.
+- ``renamed_only``  — ``identical_baseline`` vs ``renamed_only_b``
+  (same 3-task shape, different labels); normalized score ≥ 0.95 and
+  strictly above raw.
 
 Thresholds are intentionally loose for the first pass and will be tightened
 by the calibration task after one full run.
@@ -68,11 +70,16 @@ def test_renamed_only_pair_recovers_under_normalization(embedding_model):
     This is the canonical maturity claim of the framework: an authored
     rename should not look "disjoint" once you let the semantic
     normalizer line up the labels.
+
+    The A side reuses ``identical_baseline.bpmn`` directly rather than a
+    dedicated ``renamed_only_a.bpmn`` — they were byte-identical except
+    for ids, and the indirection just hid the fact that ``renamed_only_b``
+    is the *only* renamed fixture in this pair.
     """
     from bpmn_normalization import normalize_atomic_names
     from utils.string_similarity import cosine_sim_optimized
 
-    a = _load(SANITY / "renamed_only_a.bpmn")
+    a = _load(SANITY / "identical_baseline.bpmn")
     b = _load(SANITY / "renamed_only_b.bpmn")
 
     raw = calculate_bpmn_similarity(a, b, method="dice")["overall"]

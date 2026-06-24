@@ -44,12 +44,14 @@ obvious cases.
 |---|---|---|
 | `identical_baseline.bpmn` × self | All sub-scores ≥ 0.95; aggregated near 1.0. | `test_identical_model_scores_near_one` |
 | `disjoint_left_credit.bpmn` × `disjoint_right_student.bpmn` | Aggregated ≤ 0.15 — a credit-approval process versus a student-enrollment process; no shared vocabulary, no shared structure. | `test_disjoint_models_score_low` |
-| `renamed_only_a.bpmn` × `renamed_only_b.bpmn` | Same 3-task linear shape, different label strings. Raw similarity is modest (~0.28); after `normalize_atomic_names` aligns the vocabularies, the score lifts to ~1.0. This is *the* canonical maturity claim of the tool. | `test_renamed_only_pair_recovers_under_normalization` |
+| `identical_baseline.bpmn` × `renamed_only_b.bpmn` | Same 3-task linear shape, different label strings. Raw similarity is modest (~0.28); after `normalize_atomic_names` aligns the vocabularies, the score lifts to ~1.0. This is *the* canonical maturity claim of the tool. | `test_renamed_only_pair_recovers_under_normalization` |
 
-`identical_baseline.bpmn`, `semantic_naming/paraphrase_a.bpmn`,
-`semantic_naming/synonym_a.bpmn`, and `sanity/renamed_only_a.bpmn` all
-share the same canonical 3-task model (`Book flight → Pay → Confirm`)
-so every `_b` variant can be diffed against a single reference.
+`identical_baseline.bpmn`, `semantic_naming/paraphrase_a.bpmn`, and
+`semantic_naming/synonym_a.bpmn` all share the same canonical 3-task
+model (`Book flight → Pay → Confirm`) so every `_b` variant can be
+diffed against a single reference. The rename pair (above) reuses
+`identical_baseline.bpmn` as its A side — there is no separate
+`renamed_only_a.bpmn`.
 
 ### 2. Gateway substitutions — `gateway_substitutions/`
 

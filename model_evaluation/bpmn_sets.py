@@ -198,15 +198,18 @@ def get_list(bpmn_object, sublist, attribute):
 def extract_bpmn_sets(bpmn_object):
     """Extracts structure-aware lists for comparison — main process only unless otherwise specified."""
 
-    # Only MAIN process elements (top-level, not in subprocess)
+    # Element-level sets include BOTH top-level and inner (subprocess-scoped)
+    # elements, so a flat model and a folded-subprocess variant of the same
+    # process compare equal at the activity/event/gateway level. The
+    # subprocess hierarchy itself is still captured separately via
+    # subprocess_names / subprocess_elemrefs / subprocess_flows below.
     sets = {}
-    sets["activity_names"] = [a.get("name", "") for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
-    sets["activity_types"] = [_canonical_activity_type_for_comparison(a.get("type", "")) for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
-    # sets["activity_types"] = [a.get("type", "") for a in bpmn_object.get("activities", []) if not a.get("parent_subprocess", "")]
-    sets["event_names"]    = [e.get("name", "") for e in bpmn_object.get("events", []) if not e.get("parent_subprocess", "")]
-    sets["event_types"]    = [e.get("type", "") for e in bpmn_object.get("events", []) if not e.get("parent_subprocess", "")]
-    sets["gateway_names"]  = [g.get("name", "") for g in bpmn_object.get("gateways", []) if not g.get("parent_subprocess", "")]
-    sets["gateway_types"]  = [g.get("type", "") for g in bpmn_object.get("gateways", []) if not g.get("parent_subprocess", "")]
+    sets["activity_names"] = [a.get("name", "") for a in bpmn_object.get("activities", [])]
+    sets["activity_types"] = [_canonical_activity_type_for_comparison(a.get("type", "")) for a in bpmn_object.get("activities", [])]
+    sets["event_names"]    = [e.get("name", "") for e in bpmn_object.get("events", [])]
+    sets["event_types"]    = [e.get("type", "") for e in bpmn_object.get("events", [])]
+    sets["gateway_names"]  = [g.get("name", "") for g in bpmn_object.get("gateways", [])]
+    sets["gateway_types"]  = [g.get("type", "") for g in bpmn_object.get("gateways", [])]
 
     # Flows, lanes, pools as before — filter as needed
     seq_flow_with_values, mes_flow_with_values = get_flows_with_values(bpmn_object)

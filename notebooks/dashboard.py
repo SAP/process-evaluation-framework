@@ -1084,10 +1084,18 @@ def _fig_weighted_contributions(
 @app.cell
 def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
     # Plotly chart 2 — Element-level breakdown (right).
+    # Each *_names row is paired with its *_types sibling: the type score is
+    # what differentiates AND/XOR/OR-substituted gateways even when names
+    # normalize to 1.0, and what surfaces the small residual signal between
+    # otherwise-disjoint processes (shared startEvent/endEvent types). Both
+    # show up here so the headline overall is explainable from the chart.
     _e_element_rows = [
-        ("Activities", "activity_names", "elements"),
-        ("Events", "event_names", "elements"),
-        ("Gateways", "gateway_names", "elements"),
+        ("Activity Names", "activity_names", "elements"),
+        ("Activity Types", "activity_types", "elements"),
+        ("Event Names", "event_names", "elements"),
+        ("Event Types", "event_types", "elements"),
+        ("Gateway Names", "gateway_names", "elements"),
+        ("Gateway Types", "gateway_types", "elements"),
         ("Seq Flows", "seq_flows_str", "flows"),
         ("Msg Flows", "mes_flows_str", "flows"),
         ("Pool/Lane Names", "lane_names", "organizational"),
