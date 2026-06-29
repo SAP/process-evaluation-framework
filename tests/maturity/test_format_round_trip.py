@@ -3,12 +3,11 @@
 Both pairs live under ``examples/maturity/format_round_trip/``. They are
 NOT byte-identical — JSON carries Signavio diagram metadata while BPMN
 is the post-conversion XML — but after both converters land in the
-common dict shape, the structural similarity should be close to 1.0.
+common dict shape, the structural similarity should be near-perfect.
 
-Threshold is loose (≥0.8) because the converters can disagree on
-incidental fields (e.g. anonymous gateway IDs surface as different
-``*_names`` strings). Calibration will tighten this if the gap is in fact
-narrow.
+Calibrated threshold: both measured pairs land at exactly 1.000, so the
+per-test floor is ≥0.99 (one hair of tolerance for incidental converter
+changes such as a new anonymous-ID scheme).
 """
 
 import pytest
@@ -23,11 +22,8 @@ from .conftest import FORMAT_ROUND_TRIP, _load
     ["linear_sequence", "credit"],
 )
 def test_bpmn_vs_json_round_trip_is_high(stem):
-    """Calibrated: both measured pairs land at exactly 1.000 — the two
-    converters agree on the dict shape they produce. The ≥0.99 floor
-    leaves a hair of tolerance for incidental converter changes (e.g. a
-    new anonymous-ID scheme) while still catching any real divergence.
-    """
+    """Per-pair check enforcing the ≥0.99 floor described in the module
+    docstring."""
     bpmn = _load(FORMAT_ROUND_TRIP / f"{stem}.bpmn")
     sjson = _load(FORMAT_ROUND_TRIP / f"{stem}.json")
 

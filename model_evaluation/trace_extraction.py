@@ -40,6 +40,11 @@ class TraceExtractionResult:
     Use :meth:`all_traces` when comparing two models behaviorally and you want
     similarity computed over sound + partial traces together. Use
     :attr:`variants` alone when only sound behavior should count.
+
+    ``elapsed_seconds`` is the total wall-clock for :func:`extract_traces`
+    (BPMN→Petri parse + structural check + state-space exploration). The
+    exploration-only slice is available as
+    ``diagnostics.exploration_elapsed_seconds``.
     """
 
     variants: List[List[str]] = field(default_factory=list)
