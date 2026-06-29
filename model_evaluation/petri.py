@@ -61,6 +61,7 @@ class ExplorationDiagnostics:
     truncated_by_timeout: bool = False
     sound_variant_count: int = 0
     partial_trace_count: int = 0
+    elapsed_seconds: float = 0.0
 
 
 
@@ -410,6 +411,7 @@ class PetriNet(BaseModel):
             truncated_by_timeout=truncated_by_timeout,
             sound_variant_count=len(variants),
             partial_trace_count=len(partial_traces),
+            elapsed_seconds=time.monotonic() - start_time,
         )
         return variants, partial_traces, diagnostics
 
