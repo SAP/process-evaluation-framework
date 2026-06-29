@@ -39,10 +39,6 @@ from BPMN_conversion import BPMNConverter, XMLBPMNConverter  # noqa: E402
 EXAMPLES = _ROOT / "examples"
 MATURITY = EXAMPLES / "maturity"
 SANITY = MATURITY / "sanity"
-GATEWAY_SUBSTITUTIONS = MATURITY / "gateway_substitutions"
-STRUCTURAL_PERTURBATIONS = MATURITY / "structural_perturbations"
-SEMANTIC_NAMING = MATURITY / "semantic_naming"
-SUBPROCESS_FOLDING = MATURITY / "subprocess_folding"
 FORMAT_ROUND_TRIP = MATURITY / "format_round_trip"
 DEGENERATE = MATURITY / "degenerate"
 

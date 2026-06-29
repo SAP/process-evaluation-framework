@@ -9,12 +9,8 @@
              exporter="manual"
              exporterVersion="1.0">
 
-  <!-- Canonical 3-task baseline shared with semantic_naming/paraphrase_a.bpmn
-       and semantic_naming/synonym_a.bpmn. Process id/name differ so the
-       three files remain individually identifiable; the activity labels,
-       structure, and flow are byte-identical. The "_b" siblings under
-       semantic_naming/ derive from this baseline (paraphrase: minor
-       wording; synonym: domain synonyms). -->
+  <!-- Canonical 3-task baseline (Book flight -> Pay -> Confirm). Used as
+       the A side of the renamed-only pair in tests/maturity/test_sanity.py. -->
 
   <process id="identical_baseline" name="Identical Baseline" isExecutable="true">
     <startEvent id="start" name="Start">
