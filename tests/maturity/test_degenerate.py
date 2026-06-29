@@ -1,14 +1,20 @@
-"""Degenerate-input handling (partial — unsound case only).
+"""Degenerate-input handling for the maturity suite.
 
-The "empty" and "single-task" cases are deferred to task #3 (new models).
-This file pins the unsound-net handling that already ships: comparing
-``unsound_and_no_join.bpmn`` (no join, AND-split deadlocks) against the
-sound counterpart MUST return a finite score rather than raise.
+Four cases (all fixtures under ``examples/maturity/degenerate/``):
 
-The behavior itself is covered in detail by
-``tests/test_graceful_unsound_petri.py``; the assertion below is a
-maturity-suite checkpoint that the gracefulness is observable at the
-similarity-API layer, not just in the explorer.
+- ``unsound_vs_sound``  — ``unsound_and_no_join.bpmn`` (AND-split with
+  no join, deadlocks) compared to ``sound_and_with_join.bpmn`` must
+  return a finite structural score and a non-raising trace score.
+  Tighter behavioral coverage lives in
+  ``tests/test_graceful_unsound_petri.py``; the assertion below is a
+  maturity-suite checkpoint that the gracefulness is observable at the
+  similarity-API layer, not just in the explorer.
+- ``empty self-compare``      — ``empty.bpmn`` (start → end, no tasks)
+  against itself: finite score, no crash.
+- ``single-task self-compare`` — ``single_task.bpmn`` against itself
+  is ~1.0 (identical).
+- ``empty vs single-task``    — exercises the "one side is sparse" path
+  on both structural and trace similarity.
 """
 
 import math

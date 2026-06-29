@@ -12,8 +12,6 @@ Thresholds are intentionally loose for the first pass and will be tightened
 by the calibration task after one full run.
 """
 
-import pytest
-
 from bpmn_similarity import calculate_bpmn_similarity
 
 from .conftest import SANITY, _load
@@ -61,7 +59,7 @@ def test_disjoint_models_score_low():
     )
 
 
-def test_renamed_only_pair_recovers_under_normalization(embedding_model):
+def test_renamed_only_pair_recovers_under_normalization():
     """Same 3-task linear shape, second model uses different (but
     semantically equivalent) labels. Raw similarity is modest because the
     activity-name sets disagree; after ``normalize_atomic_names`` aligns
