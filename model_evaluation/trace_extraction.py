@@ -12,6 +12,7 @@ emitted via the ``model_evaluation.trace_extraction`` logger per non-sound net.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple, Union
 
@@ -44,6 +45,7 @@ class TraceExtractionResult:
     variants: List[List[str]] = field(default_factory=list)
     partial_traces: List[List[str]] = field(default_factory=list)
     diagnostics: ExplorationDiagnostics = field(default_factory=ExplorationDiagnostics)
+    elapsed_seconds: float = 0.0
 
     @property
     def is_sound(self) -> bool:
@@ -142,6 +144,7 @@ def extract_traces(
         :class:`TraceExtractionResult` with ``variants``, ``partial_traces``,
         and ``diagnostics`` populated.
     """
+    start = time.perf_counter()
     petri_net = PetriNet.from_simplified_json(minimal_bpmn)
     structural_findings = petri_net.structural_check()
 
@@ -163,6 +166,7 @@ def extract_traces(
         variants=[list(t) for t in sound_set],
         partial_traces=[list(t) for t in partial_set],
         diagnostics=diag,
+        elapsed_seconds=time.perf_counter() - start,
     )
 
 
