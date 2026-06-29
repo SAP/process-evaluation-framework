@@ -11,10 +11,8 @@
 
   <!-- Disjoint partner for disjoint_left_credit.bpmn: a genuine
        student-enrollment process. Vocabulary deliberately shares no
-       tokens with structural_perturbations/linear_baseline.bpmn (which
-       is the order-fulfillment family used elsewhere in the suite) so
-       the disjoint floor measures domain disagreement, not incidental
-       vocabulary reuse. -->
+       tokens with the credit-approval process so the disjoint floor
+       measures domain disagreement, not incidental vocabulary reuse. -->
 
   <process id="process_student_enrollment" name="Student Enrollment" isExecutable="true">
 
