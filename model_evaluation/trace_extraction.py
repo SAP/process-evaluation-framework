@@ -12,6 +12,7 @@ emitted via the ``model_evaluation.trace_extraction`` logger per non-sound net.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple, Union
 
@@ -39,11 +40,17 @@ class TraceExtractionResult:
     Use :meth:`all_traces` when comparing two models behaviorally and you want
     similarity computed over sound + partial traces together. Use
     :attr:`variants` alone when only sound behavior should count.
+
+    ``elapsed_seconds`` is the total wall-clock for :func:`extract_traces`
+    (BPMN→Petri parse + structural check + state-space exploration). The
+    exploration-only slice is available as
+    ``diagnostics.exploration_elapsed_seconds``.
     """
 
     variants: List[List[str]] = field(default_factory=list)
     partial_traces: List[List[str]] = field(default_factory=list)
     diagnostics: ExplorationDiagnostics = field(default_factory=ExplorationDiagnostics)
+    elapsed_seconds: float = 0.0
 
     @property
     def is_sound(self) -> bool:
@@ -142,6 +149,7 @@ def extract_traces(
         :class:`TraceExtractionResult` with ``variants``, ``partial_traces``,
         and ``diagnostics`` populated.
     """
+    start = time.perf_counter()
     petri_net = PetriNet.from_simplified_json(minimal_bpmn)
     structural_findings = petri_net.structural_check()
 
@@ -163,6 +171,7 @@ def extract_traces(
         variants=[list(t) for t in sound_set],
         partial_traces=[list(t) for t in partial_set],
         diagnostics=diag,
+        elapsed_seconds=time.perf_counter() - start,
     )
 
 
