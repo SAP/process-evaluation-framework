@@ -406,7 +406,7 @@ class BPMNConverter:
 XML_conversion.py
 =================
 Converts BPMN 2.0 XML files to the same minimal JSON format that
-BPMN_conversion.py (Signavio JSON → minimal JSON) produces.
+bpmn_conversion.py (Signavio JSON → minimal JSON) produces.
 
 Supported input
 ---------------
@@ -567,7 +567,7 @@ class XMLBPMNConverter:
     """
     BPMN 2.0 XML → minimal BPMNModel converter.
 
-    Mirrors the design of BPMNConverter (BPMN_conversion.py) but reads XML
+    Mirrors the design of BPMNConverter (bpmn_conversion.py) but reads XML
     instead of Signavio JSON.  Key differences:
 
     * sourceRef / targetRef are explicit attributes on <sequenceFlow> in XML,
@@ -875,38 +875,3 @@ class XMLBPMNConverter:
         for collection in (model.activities, model.events, model.gateways):
             for item in collection:
                 item.pop("parent_lane", None)
-
-
-# == Command-line convenience ================================================
-
-# def convert_file(path: str) -> BPMNModel:
-#     """Module-level shortcut: load *path* and return a BPMNModel."""
-#     return XMLBPMNConverter.convert_file(path)
-
-# if __name__ == "__main__":
-#     import sys
-
-#     if len(sys.argv) < 2:
-#         print("Module Usage: python XML_conversion.py <file.bpmn>, this then prints minimal model to stdout", file=sys.stderr)
-#         sys.exit(1)
-
-#     with open(sys.argv[1], "r", encoding="utf-8") as fh:
-#         data = fh.read()
-
-#     model = XMLBPMNConverter.convert(data)
-#     print(model.to_json())
-
-
-
-# if __name__ == "__main__":
-#     import sys
-
-#     if len(sys.argv) < 2:
-#         print("Module Usage: python BPMN_conversion.py <file.json>, this then prints minimal model to stdout", file=sys.stderr)
-#         sys.exit(1)
-
-#     with open(sys.argv[1], "r", encoding="utf-8") as fh:
-#         data = fh.read()
-
-#     model = BPMNConverter.convert(data)
-#     print(model.to_json())

@@ -1,9 +1,8 @@
 """Marimo dashboard for BPMN similarity exploration.
 
-Reactive re-skin of ``model_evaluation/rendering/dashboard.py``. Same three
-sections (structural / behavioral / hybrid + n-gram subpanel), same underlying
-similarity functions; cleaner card-based layout, Plotly charts, and marimo's
-reactive cell graph in place of ipywidgets event handlers and manual caches.
+Three sections (structural / behavioral / hybrid) over the
+similarity functions in ``model_evaluation``. Card-based layout, Plotly
+charts, and marimo's reactive cell graph for updates as inputs change.
 
 Run interactively:
     poetry run marimo edit notebooks/dashboard.py
@@ -45,7 +44,7 @@ def _imports():
         calculate_ngram_similarity,
         calculate_trace_similarity,
     )
-    from model_evaluation.BPMN_conversion import BPMNConverter, XMLBPMNConverter
+    from model_evaluation.bpmn_conversion import BPMNConverter, XMLBPMNConverter
     from trace_extraction import extract_ngrams, extract_traces
     from utils.string_similarity import cosine_sim_optimized
 
@@ -479,9 +478,8 @@ def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
 
 @app.cell
 def _bpmn_iframe_helper(base64):
-    # Same iframe trick as ``rendering/bpmn_viewer.render_bpmn_xml_embed``,
-    # but returns the HTML string directly (the stock helper calls
-    # ``display(HTML(...))`` which marimo can't capture).
+    # Embed bpmn-js in a sandboxed iframe so the BPMN XML renders inside the
+    # dashboard. Returns the HTML string so marimo can capture it directly.
     _viewer_script = (
         "https://unpkg.com/bpmn-js@17.11.1/dist/"
         "bpmn-navigated-viewer.production.min.js"
@@ -1304,9 +1302,8 @@ def _extract_traces(
     # Reactive trace extraction. Re-runs whenever ``m2_aligned`` or
     # ``model_1_json`` changes (model selection, normalization threshold,
     # metric). Trace timeout and max-loop-depth are pinned to sensible
-    # defaults — the original ipywidgets dashboard exposed them as sliders
-    # but they're rarely touched in practice, and the run-button gate
-    # added more friction than it saved.
+    # defaults; they're rarely touched in practice and exposing them as
+    # controls added more friction than it saved.
     TRACE_TIMEOUT = 15  # seconds; raised from 5 to let the P2P examples
                         # enumerate their full trace set deterministically
                         # before the Petri-net explorer's wall-clock budget

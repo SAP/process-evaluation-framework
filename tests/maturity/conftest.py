@@ -23,7 +23,7 @@ for _path in (str(_ROOT), str(_MODEL_EVAL)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from BPMN_conversion import BPMNConverter, XMLBPMNConverter  # noqa: E402
+from bpmn_conversion import BPMNConverter, XMLBPMNConverter  # noqa: E402
 
 
 # All maturity fixtures live under examples/maturity/<category>/. Category

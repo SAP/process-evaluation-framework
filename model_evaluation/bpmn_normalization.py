@@ -8,7 +8,7 @@ with similar but not identical naming conventions.
 
 Type fields (activity types, event types, gateway types) are NOT normalized here;
 they are canonicalized deterministically at the conversion boundary
-(see BPMN_conversion.py: canonicalize_gateway_type, ACTIVITY_TYPE_MAP).
+(see bpmn_conversion.py: canonicalize_gateway_type, ACTIVITY_TYPE_MAP).
 
 Scope separation
 ----------------
