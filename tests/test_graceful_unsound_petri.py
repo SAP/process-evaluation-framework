@@ -12,19 +12,17 @@ Covers three layers in one file:
    ``TraceExtractionResult``.
 """
 
-import json
 import logging
 from pathlib import Path
 
 import pytest
 
 from model_evaluation import (
-    BPMNConverter,
     TraceExtractionResult,
-    XMLBPMNConverter,
     calculate_trace_similarity,
     compare_trace_sets,
     extract_traces,
+    load_bpmn,
 )
 from model_evaluation.petri import (
     DeadlockSignature,
@@ -143,11 +141,12 @@ def _build_self_loop() -> PetriNet:
 
 
 def _load(path: Path):
-    """Mirror comparison_widget._load_model so tests use the same pipeline."""
-    if path.suffix in (".xml", ".bpmn"):
-        return XMLBPMNConverter.convert_file(str(path)).to_dict()
-    with path.open("r", encoding="utf-8") as f:
-        return BPMNConverter.convert(json.load(f)).to_dict()
+    """Backwards-compatible alias for the public :func:`load_bpmn` loader.
+
+    Kept so existing call sites don't churn; new tests should import
+    ``load_bpmn`` from ``model_evaluation`` directly.
+    """
+    return load_bpmn(path)
 
 
 # ---------------------------------------------------------------------------

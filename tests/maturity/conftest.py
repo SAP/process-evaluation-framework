@@ -10,10 +10,9 @@ Adds:
   repeat path joining and a folder rename touches one line.
 """
 
-import json
 from pathlib import Path
 
-from model_evaluation import BPMNConverter, XMLBPMNConverter
+from model_evaluation import load_bpmn as _load  # re-exported for tests
 
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
@@ -27,15 +26,11 @@ SANITY = MATURITY / "sanity"
 FORMAT_ROUND_TRIP = MATURITY / "format_round_trip"
 DEGENERATE = MATURITY / "degenerate"
 
-
-def _load(path: Path):
-    """Mirror ``comparison_widget._load_model`` and the unsound-net tests.
-
-    XML / BPMN files go through ``XMLBPMNConverter``; everything else is
-    treated as Signavio-style JSON. Suffix matching is case-insensitive
-    to match ``notebooks/dashboard.py``'s loader.
-    """
-    if path.suffix.lower() in (".xml", ".bpmn"):
-        return XMLBPMNConverter.convert_file(str(path)).to_dict()
-    with path.open("r", encoding="utf-8") as f:
-        return BPMNConverter.convert(json.load(f)).to_dict()
+__all__ = [
+    "_load",
+    "EXAMPLES",
+    "MATURITY",
+    "SANITY",
+    "FORMAT_ROUND_TRIP",
+    "DEGENERATE",
+]

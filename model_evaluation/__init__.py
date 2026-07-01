@@ -29,7 +29,7 @@ Semantic name alignment (``normalize_atomic_names``) requires the optional
 to pull ``sentence-transformers`` and ``scikit-learn``.
 """
 
-from ._loaders import load_bpmn_xml, load_signavio_json
+from ._loaders import load_bpmn, load_bpmn_xml, load_signavio_json
 from .BPMN_conversion import BPMNConverter, XMLBPMNConverter
 from .bpmn_sets import extract_bpmn_sets
 from .bpmn_similarity import (
@@ -46,20 +46,21 @@ from .trace_extraction import (
 )
 
 
-def normalize_atomic_names(*args, **kwargs):
-    """Semantic-embedding name alignment between two BPMN models.
-
-    Lazy-imported so importing :mod:`model_evaluation` does not require the
-    optional ``sentence-transformers`` / ``scikit-learn`` dependencies.
-    Install them with ``pip install -e '.[normalization]'`` (or
-    ``poetry install --with normalization``) before calling this function.
+def __getattr__(name):
+    """Lazily expose optional-extra symbols so importing this package does not
+    pull in ``sentence-transformers`` / ``scikit-learn`` unless the caller
+    actually reaches for them. Install with ``pip install -e '.[normalization]'``
+    to enable :func:`normalize_atomic_names`.
     """
-    from .bpmn_normalization import normalize_atomic_names as _impl
-    return _impl(*args, **kwargs)
+    if name == "normalize_atomic_names":
+        from .bpmn_normalization import normalize_atomic_names as _fn
+        return _fn
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
     # Loaders
+    "load_bpmn",
     "load_bpmn_xml",
     "load_signavio_json",
     # Converters (for callers who already have parsed JSON / XML strings)
