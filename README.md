@@ -17,6 +17,45 @@ This repository provides a comprehensive framework for evaluating and comparing 
 
 The framework supports pools, lanes, message flows, subprocesses, and provides detailed element-level breakdowns with configurable category weights.
 
+## Using as a library
+
+The evaluation logic is packaged as an importable Python library. Install the repo in editable mode from its root:
+
+```
+poetry install                         # core only — enough for structural + trace + hybrid similarity
+poetry install --extras normalization  # adds semantic name alignment (pulls sentence-transformers / torch)
+poetry install --extras dashboard      # adds the marimo dashboard + notebook deps
+poetry install --all-extras            # everything
+```
+
+(Equivalent with pip: `pip install -e .`, `pip install -e '.[normalization]'`, `pip install -e '.[dashboard]'`.)
+
+Then use the public API:
+
+```python
+from model_evaluation import (
+    load_bpmn_xml, load_signavio_json,
+    calculate_bpmn_similarity,
+    calculate_trace_similarity, calculate_ngram_similarity,
+    calculate_hybrid_similarity,
+    extract_traces,
+)
+
+m1 = load_bpmn_xml("process1.bpmn")
+m2 = load_bpmn_xml("process2.bpmn")
+
+structural = calculate_bpmn_similarity(m1, m2, method="dice")
+t1, t2 = extract_traces(m1), extract_traces(m2)
+behavioral = calculate_trace_similarity(t1, t2, method="jaccard")
+hybrid = calculate_hybrid_similarity(structural, behavioral, structural_weight=0.5)
+
+print(f"structural={structural['overall']:.2f}  behavioral={behavioral:.2f}  hybrid={hybrid['hybrid']:.2f}")
+```
+
+`normalize_atomic_names` is available when the `normalization` extra is installed; calling it without the extra raises a clear `ImportError`.
+
+**Input format.** All similarity and trace functions accept the same internal *minimal BPMN* dict: keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, `messageFlows`. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly. The full shape is documented in `model_evaluation/bpmn_schema.py`.
+
 ## Project Structure
 
 ```

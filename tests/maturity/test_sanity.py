@@ -12,7 +12,7 @@ Thresholds are intentionally loose for the first pass and will be tightened
 by the calibration task after one full run.
 """
 
-from bpmn_similarity import calculate_bpmn_similarity
+from model_evaluation import calculate_bpmn_similarity
 
 from .conftest import SANITY, _load
 
@@ -74,8 +74,8 @@ def test_renamed_only_pair_recovers_under_normalization():
     for ids, and the indirection just hid the fact that ``renamed_only_b``
     is the *only* renamed fixture in this pair.
     """
-    from bpmn_normalization import normalize_atomic_names
-    from utils.string_similarity import cosine_sim_optimized
+    from model_evaluation import normalize_atomic_names
+    from model_evaluation.utils.string_similarity import cosine_sim_optimized
 
     a = _load(SANITY / "identical_baseline.bpmn")
     b = _load(SANITY / "renamed_only_b.bpmn")

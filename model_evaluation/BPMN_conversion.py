@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, List, Union
 
-from sapsam_mapping import sapsam_mapping
+from .sapsam_mapping import sapsam_mapping
 
 BPMNShape = Dict[str, Any]
 FlattenedBPMN = Dict[str, List[Dict[str, Any]]]

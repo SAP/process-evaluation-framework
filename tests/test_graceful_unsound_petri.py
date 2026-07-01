@@ -18,8 +18,15 @@ from pathlib import Path
 
 import pytest
 
-from BPMN_conversion import BPMNConverter, XMLBPMNConverter
-from petri import (
+from model_evaluation import (
+    BPMNConverter,
+    TraceExtractionResult,
+    XMLBPMNConverter,
+    calculate_trace_similarity,
+    compare_trace_sets,
+    extract_traces,
+)
+from model_evaluation.petri import (
     DeadlockSignature,
     ExplorationDiagnostics,
     Marking,
@@ -28,12 +35,6 @@ from petri import (
     SoundnessStatus,
     Transition,
 )
-from trace_extraction import (
-    TraceExtractionResult,
-    compare_trace_sets,
-    extract_traces,
-)
-from bpmn_similarity import calculate_trace_similarity
 
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "old_models"
