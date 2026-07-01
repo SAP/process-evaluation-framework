@@ -2,7 +2,7 @@
 
 Adds:
 
-- A ``_load(path)`` helper mirroring ``tests/test_graceful_unsound_petri.py``
+- A ``_load(path)`` helper mirroring ``tests/petri/test_petri_soundness.py``
   so every maturity test goes through the same loader the dashboard uses.
 
 - Path constants (``EXAMPLES``, ``MATURITY``, ``SANITY``,

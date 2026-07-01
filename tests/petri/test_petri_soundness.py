@@ -1,6 +1,28 @@
-"""End-to-end tests for graceful handling of unsound Petri nets.
+"""Deep contract tests for graceful handling of unsound Petri nets.
 
-Covers three layers in one file:
+Where this fits in the test suite
+---------------------------------
+This file is the *internals* layer for the unsound-net handling in
+``petri.py`` / ``trace_extraction.py``. It complements
+``tests/maturity/test_degenerate.py``, which smoke-tests the *outer*
+similarity API on the same fixtures ("does the pipeline return a finite
+score without crashing?"). Split of concerns:
+
+  * This file  — hand-built ``PetriNet`` objects; pins internal contracts:
+                 ``PetriNet.structural_check`` findings, enum values on
+                 ``SoundnessStatus``, dedup rules on ``DeadlockSignature``,
+                 the "exactly one WARNING per non-sound extraction" log
+                 contract, and ``TraceExtractionResult`` back-compat.
+  * ``maturity/test_degenerate.py`` — end-to-end smoke: same degenerate
+                 inputs go through ``calculate_bpmn_similarity`` /
+                 ``calculate_trace_similarity`` and must return numbers
+                 in ``[0, 1]`` (or ``None``) without raising.
+
+Both files load the same two BPMN fixtures
+(``examples/old_models/and_gateway_with_join.bpmn`` and
+``and_gateway_no_join.bpmn``). The rest are hand-built here.
+
+Coverage phases (matches the original refactor plan comments):
 
 1. Structural pre-check (Phase 1) — ``PetriNet.structural_check`` and the
    diagnostics dataclasses (``SoundnessStatus``, ``StructuralFinding``,
@@ -36,7 +58,7 @@ from trace_extraction import (
 from bpmn_similarity import calculate_trace_similarity
 
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "old_models"
+EXAMPLES = Path(__file__).resolve().parent.parent.parent / "examples" / "old_models"
 
 
 # ---------------------------------------------------------------------------
