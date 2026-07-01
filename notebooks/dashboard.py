@@ -45,7 +45,7 @@ def _imports():
         calculate_ngram_similarity,
         calculate_trace_similarity,
     )
-    from model_evaluation.BPMN_conversion import XMLBPMNConverter
+    from model_evaluation.BPMN_conversion import BPMNConverter, XMLBPMNConverter
     from trace_extraction import extract_ngrams, extract_traces
     from utils.string_similarity import cosine_sim_optimized
 
@@ -60,6 +60,7 @@ def _imports():
     REPO_ROOT = _repo_root
     EXAMPLES_DIR = _repo_root / "examples"
     return (
+        BPMNConverter,
         CATEGORY_COLORS,
         EXAMPLES_DIR,
         NO_DATA_COLOR,
@@ -352,22 +353,26 @@ def _intro(mo):
 
 @app.cell
 def _bpmn_options(EXAMPLES_DIR):
-    # Recursive scan of examples/ for .bpmn files. Display labels are
-    # relative to examples/ so nested folders (e.g. testing_models/...) are
-    # visible in the dropdown.
-    paths = sorted(EXAMPLES_DIR.rglob("*.bpmn"))
+    # Recursive scan of examples/ for supported model files (.bpmn for
+    # BPMN 2.0 XML, .json for Signavio export). Display labels are
+    # relative to examples/ so nested folders (e.g. maturity/...) are
+    # visible in the dropdown and BPMN/JSON variants of the same model
+    # sort next to each other.
+    paths = sorted(
+        list(EXAMPLES_DIR.rglob("*.bpmn")) + list(EXAMPLES_DIR.rglob("*.json"))
+    )
     bpmn_options = {str(p.relative_to(EXAMPLES_DIR)): str(p) for p in paths}
 
     # Defaults: the P2P pair if present, otherwise the first two entries.
-    _preferred_1 = "testing_models/P2P - Running Example.bpmn"
-    _preferred_2 = "testing_models/P2P - Variant Running Example.bpmn"
+    _preferred_1 = "P2P - Running Example.bpmn"
+    _preferred_2 = "P2P - Variant Running Example.bpmn"
     _keys = list(bpmn_options.keys())
     default_1 = _preferred_1 if _preferred_1 in bpmn_options else (_keys[0] if _keys else None)
     default_2 = _preferred_2 if _preferred_2 in bpmn_options else (_keys[1] if len(_keys) > 1 else default_1)
-    # Flag for the downstream cards: when the user only has one .bpmn file
-    # in examples/, both dropdowns default to it. We surface a banner
-    # instead of silently comparing a model with itself (which yields a
-    # misleading 100% similarity).
+    # Flag for the downstream cards: when the user only has one model
+    # file in examples/, both dropdowns default to it. We surface a
+    # banner instead of silently comparing a model with itself (which
+    # yields a misleading 100% similarity).
     only_one_file = len(_keys) < 2
     return bpmn_options, default_1, default_2, only_one_file
 
@@ -396,17 +401,17 @@ def _models_card(card, mo, model1_dd, model2_dd, only_one_file):
     # the outer edges. ``full_width=True`` on the dropdowns themselves
     # makes them stretch to fill their column.
     #
-    # When the user only has one .bpmn file in examples/, prepend a warning
-    # banner so they don't mistake the resulting self-comparison for a real
-    # result. The downstream ``_load_models`` cell also refuses to proceed
-    # when both dropdowns point at the same file.
+    # When the user only has one model file in examples/, prepend a
+    # warning banner so they don't mistake the resulting self-comparison
+    # for a real result. The downstream ``_load_models`` cell also
+    # refuses to proceed when both dropdowns point at the same file.
     _body = [mo.hstack([model1_dd, model2_dd], widths="equal", gap=1)]
     if only_one_file:
         _body.insert(
             0,
             mo.Html(
                 "<div class='pe-stale'>"
-                "Only one BPMN file found in <code>examples/</code> — "
+                "Only one model file found in <code>examples/</code> — "
                 "add a second file (or pick different ones below) to "
                 "compare two distinct models."
                 "</div>"
@@ -424,32 +429,51 @@ def _models_card(card, mo, model1_dd, model2_dd, only_one_file):
 
 
 @app.cell
-def _load_models(XMLBPMNConverter, mo, model1_dd, model2_dd):
-    # Parse the two selected .bpmn files into the minimal-BPMN dicts.
+def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
+    # Parse the two selected model files into the minimal-BPMN dicts.
     #
-    # Reactivity: re-runs whenever either dropdown changes. The XML strings
-    # are kept around for the BPMN preview iframes below.
+    # Supports both BPMN 2.0 XML (.bpmn/.xml) and Signavio JSON (.json),
+    # dispatched on suffix — mirrors the canonical ``load_model``
+    # pattern documented in ``notebooks/model_eval_code_usage.ipynb``.
+    # Both converters land in the same dict shape so everything
+    # downstream is format-agnostic.
+    #
+    # Reactivity: re-runs whenever either dropdown changes. The XML
+    # strings are kept around for the BPMN preview iframes below — for
+    # JSON files xml1/xml2 stay None and the preview cell renders a
+    # stub instead.
     #
     # Stop conditions:
-    #  - either dropdown empty (initial render before defaults resolve, or
-    #    no .bpmn files in examples/);
-    #  - both dropdowns pointing at the same file (would silently produce a
-    #    100%-identical "comparison").
+    #  - either dropdown empty (initial render before defaults resolve,
+    #    or no model files in examples/);
+    #  - both dropdowns pointing at the same file (would silently
+    #    produce a 100%-identical "comparison").
     mo.stop(
         not (model1_dd.value and model2_dd.value),
-        mo.md("_Pick two BPMN files above to load the models._"),
+        mo.md("_Pick two model files above to load the models._"),
     )
     mo.stop(
         model1_dd.value == model2_dd.value,
-        mo.md("_Pick two **different** BPMN files to compare._"),
+        mo.md("_Pick two **different** model files to compare._"),
     )
 
+    import json as _json
     from pathlib import Path as _Path
 
-    xml1 = _Path(model1_dd.value).read_text(encoding="utf-8")
-    xml2 = _Path(model2_dd.value).read_text(encoding="utf-8")
-    model_1_json = XMLBPMNConverter.convert_file(model1_dd.value).to_dict()
-    model_2_json = XMLBPMNConverter.convert_file(model2_dd.value).to_dict()
+    def _load_one(path_str):
+        path = _Path(path_str)
+        if path.suffix.lower() in (".bpmn", ".xml"):
+            return (
+                XMLBPMNConverter.convert_file(path_str).to_dict(),
+                path.read_text(encoding="utf-8"),
+            )
+        # Signavio JSON path — no XML preview available.
+        with open(path_str, "r", encoding="utf-8") as fh:
+            raw = _json.load(fh)
+        return BPMNConverter.convert(raw).to_dict(), None
+
+    model_1_json, xml1 = _load_one(model1_dd.value)
+    model_2_json, xml2 = _load_one(model2_dd.value)
     return model_1_json, model_2_json, xml1, xml2
 
 
@@ -514,6 +538,11 @@ def _bpmn_iframe_helper(base64):
 @app.cell
 def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
     # Render both diagrams side-by-side, each in its own card.
+    #
+    # When the selected file is Signavio JSON, xml1/xml2 is None — we
+    # don't have a BPMN viewer for that format, so we render a small
+    # stub message instead of failing. Similarity comparison further
+    # down still runs because both formats land in the same dict shape.
     _label_1 = model1_dd.selected_key if hasattr(model1_dd, "selected_key") else "Model 1"
     _label_2 = model2_dd.selected_key if hasattr(model2_dd, "selected_key") else "Model 2"
     # selected_key isn't always available across marimo versions — fall back
@@ -523,11 +552,18 @@ def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
     except Exception:
         _opts = None
 
+    _json_stub = mo.Html(
+        "<div style='padding: 28px; color: #64748b; font-style: italic; "
+        "text-align: center; border: 1px dashed #cbd5e1; border-radius: 8px;'>"
+        "Preview unavailable for Signavio JSON — comparison still runs below."
+        "</div>"
+    )
+
     diagrams = mo.vstack(
         [
             card(
                 "Model 1",
-                mo.Html(bpmn_iframe(xml1)),
+                mo.Html(bpmn_iframe(xml1)) if xml1 is not None else _json_stub,
                 info=(
                     "Rendered diagram of the first selected BPMN file "
                     "(bpmn-js viewer). Scroll to zoom, drag to pan."
@@ -535,7 +571,7 @@ def _bpmn_preview(bpmn_iframe, card, mo, model1_dd, model2_dd, xml1, xml2):
             ),
             card(
                 "Model 2",
-                mo.Html(bpmn_iframe(xml2)),
+                mo.Html(bpmn_iframe(xml2)) if xml2 is not None else _json_stub,
                 info=(
                     "Rendered diagram of the second selected BPMN file "
                     "(bpmn-js viewer). Scroll to zoom, drag to pan."
@@ -1048,10 +1084,18 @@ def _fig_weighted_contributions(
 @app.cell
 def _fig_element_breakdown(CATEGORY_COLORS, NO_DATA_COLOR, go, struct_result):
     # Plotly chart 2 — Element-level breakdown (right).
+    # Each *_names row is paired with its *_types sibling: the type score is
+    # what differentiates AND/XOR/OR-substituted gateways even when names
+    # normalize to 1.0, and what surfaces the small residual signal between
+    # otherwise-disjoint processes (shared startEvent/endEvent types). Both
+    # show up here so the headline overall is explainable from the chart.
     _e_element_rows = [
-        ("Activities", "activity_names", "elements"),
-        ("Events", "event_names", "elements"),
-        ("Gateways", "gateway_names", "elements"),
+        ("Activity Names", "activity_names", "elements"),
+        ("Activity Types", "activity_types", "elements"),
+        ("Event Names", "event_names", "elements"),
+        ("Event Types", "event_types", "elements"),
+        ("Gateway Names", "gateway_names", "elements"),
+        ("Gateway Types", "gateway_types", "elements"),
         ("Seq Flows", "seq_flows_str", "flows"),
         ("Msg Flows", "mes_flows_str", "flows"),
         ("Pool/Lane Names", "lane_names", "organizational"),
