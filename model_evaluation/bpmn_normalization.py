@@ -26,8 +26,8 @@ Typical workflow:
 4. Proceed with standard BPMN similarity calculation
 
 Example:
-    from bpmn_normalization import normalize_atomic_names
-    from utils.string_similarity import bert_cosine_optimized
+    from model_evaluation import normalize_atomic_names
+    from model_evaluation.utils.string_similarity import bert_cosine_optimized
 
     model2_aligned, mappings = normalize_atomic_names(
         model1, model2, bert_cosine_optimized, threshold=0.7
@@ -335,7 +335,7 @@ def normalize_atomic_names(model1, model2, similarity_func, threshold=0.7):
         ...     threshold=0.7
         ... )
         >>> # Now compare with standard similarity calculation
-        >>> from bpmn_similarity import calculate_bpmn_similarity
+        >>> from model_evaluation import calculate_bpmn_similarity
         >>> similarity = calculate_bpmn_similarity(
         ...     ground_truth_model, model2_aligned, method="dice"
         ... )
