@@ -12,7 +12,7 @@ changes such as a new anonymous-ID scheme).
 
 import pytest
 
-from bpmn_similarity import calculate_bpmn_similarity
+from model_evaluation import calculate_bpmn_similarity
 
 from .conftest import FORMAT_ROUND_TRIP, _load
 
