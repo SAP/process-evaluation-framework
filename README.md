@@ -75,7 +75,7 @@ model_evaluation/
 
 notebooks/
 ├── dashboard.py                # Interactive similarity dashboard (marimo)
-└── model_eval_code_usage.ipynb # Usage examples and demonstrations
+└── library_walkthrough.ipynb  # Guided tour of the library API
 
 examples/                       # Sample BPMN models for testing
 ```

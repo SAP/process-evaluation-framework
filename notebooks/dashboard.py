@@ -426,7 +426,7 @@ def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
     #
     # Supports both BPMN 2.0 XML (.bpmn/.xml) and Signavio JSON (.json),
     # dispatched on suffix — mirrors the canonical ``load_model``
-    # pattern documented in ``notebooks/model_eval_code_usage.ipynb``.
+    # pattern documented in ``notebooks/library_walkthrough.ipynb``.
     # Both converters land in the same dict shape so everything
     # downstream is format-agnostic.
     #
