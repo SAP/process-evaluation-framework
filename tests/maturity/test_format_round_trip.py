@@ -1,6 +1,6 @@
 """Format round-trip: BPMN XML vs Signavio JSON of the same model.
 
-Both pairs live under ``examples/maturity/format_round_trip/``. They are
+Both pairs live under ``examples/testing_models/format_round_trip/``. They are
 NOT byte-identical — JSON carries Signavio diagram metadata while BPMN
 is the post-conversion XML — but after both converters land in the
 common dict shape, the structural similarity should be near-perfect.

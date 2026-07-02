@@ -1,9 +1,8 @@
 """Marimo dashboard for BPMN similarity exploration.
 
-Reactive re-skin of ``model_evaluation/rendering/dashboard.py``. Same three
-sections (structural / behavioral / hybrid + n-gram subpanel), same underlying
-similarity functions; cleaner card-based layout, Plotly charts, and marimo's
-reactive cell graph in place of ipywidgets event handlers and manual caches.
+Three sections (structural / behavioral / hybrid) over the
+similarity functions in ``model_evaluation``. Card-based layout, Plotly
+charts, and marimo's reactive cell graph for updates as inputs change.
 
 Run interactively:
     poetry run marimo edit notebooks/dashboard.py
@@ -357,8 +356,8 @@ def _bpmn_options(EXAMPLES_DIR):
     bpmn_options = {str(p.relative_to(EXAMPLES_DIR)): str(p) for p in paths}
 
     # Defaults: the P2P pair if present, otherwise the first two entries.
-    _preferred_1 = "P2P - Running Example.bpmn"
-    _preferred_2 = "P2P - Variant Running Example.bpmn"
+    _preferred_1 = "p2p_running_example.bpmn"
+    _preferred_2 = "p2p_running_example_variant.bpmn"
     _keys = list(bpmn_options.keys())
     default_1 = _preferred_1 if _preferred_1 in bpmn_options else (_keys[0] if _keys else None)
     default_2 = _preferred_2 if _preferred_2 in bpmn_options else (_keys[1] if len(_keys) > 1 else default_1)
@@ -427,7 +426,7 @@ def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
     #
     # Supports both BPMN 2.0 XML (.bpmn/.xml) and Signavio JSON (.json),
     # dispatched on suffix — mirrors the canonical ``load_model``
-    # pattern documented in ``notebooks/model_eval_code_usage.ipynb``.
+    # pattern documented in ``notebooks/library_walkthrough.ipynb``.
     # Both converters land in the same dict shape so everything
     # downstream is format-agnostic.
     #
@@ -472,9 +471,8 @@ def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
 
 @app.cell
 def _bpmn_iframe_helper(base64):
-    # Same iframe trick as ``rendering/bpmn_viewer.render_bpmn_xml_embed``,
-    # but returns the HTML string directly (the stock helper calls
-    # ``display(HTML(...))`` which marimo can't capture).
+    # Embed bpmn-js in a sandboxed iframe so the BPMN XML renders inside the
+    # dashboard. Returns the HTML string so marimo can capture it directly.
     _viewer_script = (
         "https://unpkg.com/bpmn-js@17.11.1/dist/"
         "bpmn-navigated-viewer.production.min.js"
@@ -1297,9 +1295,8 @@ def _extract_traces(
     # Reactive trace extraction. Re-runs whenever ``m2_aligned`` or
     # ``model_1_json`` changes (model selection, normalization threshold,
     # metric). Trace timeout and max-loop-depth are pinned to sensible
-    # defaults — the original ipywidgets dashboard exposed them as sliders
-    # but they're rarely touched in practice, and the run-button gate
-    # added more friction than it saved.
+    # defaults; they're rarely touched in practice and exposing them as
+    # controls added more friction than it saved.
     TRACE_TIMEOUT = 15  # seconds; raised from 5 to let the P2P examples
                         # enumerate their full trace set deterministically
                         # before the Petri-net explorer's wall-clock budget

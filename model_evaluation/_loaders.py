@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Union
 
-from .BPMN_conversion import BPMNConverter, XMLBPMNConverter
+from .bpmn_conversion import BPMNConverter, XMLBPMNConverter
 
 
 def load_bpmn_xml(path: Union[str, Path]) -> dict:
