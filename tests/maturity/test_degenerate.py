@@ -6,7 +6,7 @@ Four cases (all fixtures under ``examples/maturity/degenerate/``):
   no join, deadlocks) compared to ``sound_and_with_join.bpmn`` must
   return a finite structural score and a non-raising trace score.
   Tighter behavioral coverage lives in
-  ``tests/test_graceful_unsound_petri.py``; the assertion below is a
+  ``tests/petri/test_petri_soundness.py``; the assertion below is a
   maturity-suite checkpoint that the gracefulness is observable at the
   similarity-API layer, not just in the explorer.
 - ``empty self-compare``      — ``empty.bpmn`` (start → end, no tasks)
