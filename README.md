@@ -66,7 +66,7 @@ print(f"structural={structural['overall']:.2f}  behavioral={behavioral:.2f}  hyb
 
 `normalize_atomic_names` is available when the `normalization` extra is installed; calling it without the extra raises a clear `ImportError`.
 
-**Input format.** All similarity and trace functions accept the same internal *minimal BPMN* dict with keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, and `messageFlows`. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly.
+**Input format.** All similarity and trace functions accept the same internal *minimal BPMN* JSON with keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, and `messageFlows`. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly.
 
 For a guided tour of the full API, open `notebooks/library_walkthrough.ipynb`.
 
