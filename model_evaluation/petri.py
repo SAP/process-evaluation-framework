@@ -663,9 +663,6 @@ class PetriNet(BaseModel):
             if bpmn_event_id in self.bpmn_elements_map and self.bpmn_elements_map[bpmn_event_id] == p_old_event_place:
                 del self.bpmn_elements_map[bpmn_event_id]
 
-    def _handle_attached_events(self, follows: Dict[str, List[str]]):
-        raise NotImplementedError("Attached events handling is not implemented yet.")
-
     def _silence_gateway_transitions(self):
         from model_evaluation.json_to_pn import get_bpmn_element_type, BpmnElementType, GATEWAY_STENCIL_NAMES
         for t in self.transitions:
@@ -760,7 +757,6 @@ class PetriNet(BaseModel):
         pn._correct_implicit_joins(implicit_join_task_bpmn_ids)
         if with_event_labels:
             pn._transform_labeled_bpmn_events_to_ptp()
-        # self._handle_attached_events(follows) # TODO Not implemented yet
         pn._silence_gateway_transitions()
         
         im, fm = pn._ensure_single_start_end_places_and_get_markings()

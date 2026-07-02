@@ -54,7 +54,7 @@ print(f"structural={structural['overall']:.2f}  behavioral={behavioral:.2f}  hyb
 
 `normalize_atomic_names` is available when the `normalization` extra is installed; calling it without the extra raises a clear `ImportError`.
 
-**Input format.** All similarity and trace functions accept the same internal *minimal BPMN* dict: keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, `messageFlows`. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly. The full shape is documented in `model_evaluation/bpmn_schema.py`.
+**Input format.** All similarity and trace functions accept the same internal *minimal BPMN* dict: keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, `messageFlows`. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly.
 
 ## Project Structure
 
@@ -63,13 +63,10 @@ model_evaluation/
 ├── utils/                      # Utility functions
 │   ├── string_similarity.py    # BERT-based semantic similarity
 │   └── list_similarity.py      # Set comparison metrics (Dice, Jaccard, etc.)
-├── rendering/                  # Visualization modules
-│   └── bpmn_viewer.py          # BPMN XML viewer using bpmn-js
-├── BPMN_conversion.py          # Signavio JSON and XML 2.0 → minimal BPMN converter
+├── bpmn_conversion.py          # Signavio JSON and XML 2.0 → minimal BPMN converter
 ├── bpmn_normalization.py       # Semantic name alignment
 ├── bpmn_sets.py                # Element set extraction
 ├── bpmn_similarity.py          # Similarity calculation engine
-├── bpmn_schema.py              # Data structures and validation
 ├── json_to_pn.py               # Minimal JSON to Flow Structure
 ├── petri.py                    # Petri net
 ├── trace_extraction.py         # Trace/variant extraction via Petri nets
@@ -92,6 +89,10 @@ poetry run marimo edit notebooks/dashboard.py
 ```
 
 It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view. Use `marimo run` instead of `edit` for a read-only app view.
+
+## Known limitations
+
+- **Attached (boundary) events** on BPMN activities are not currently handled by the Petri-net trace extraction; models that rely on them may not fully reflect their behavioral variants.
 
 ## Requirements and Setup
 

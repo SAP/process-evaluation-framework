@@ -26,11 +26,11 @@ Typical usage::
 
 Semantic name alignment (``normalize_atomic_names``) requires the optional
 ``[normalization]`` extra — install with ``pip install -e '.[normalization]'``
-to pull ``sentence-transformers`` and ``scikit-learn``.
+to pull ``sentence-transformers``.
 """
 
 from ._loaders import load_bpmn, load_bpmn_xml, load_signavio_json
-from .BPMN_conversion import BPMNConverter, XMLBPMNConverter
+from .bpmn_conversion import BPMNConverter, XMLBPMNConverter
 from .bpmn_sets import extract_bpmn_sets
 from .bpmn_similarity import (
     calculate_bpmn_similarity,
@@ -48,9 +48,9 @@ from .trace_extraction import (
 
 def __getattr__(name):
     """Lazily expose optional-extra symbols so importing this package does not
-    pull in ``sentence-transformers`` / ``scikit-learn`` unless the caller
-    actually reaches for them. Install with ``pip install -e '.[normalization]'``
-    to enable :func:`normalize_atomic_names`.
+    pull in ``sentence-transformers`` unless the caller actually reaches for
+    them. Install with ``pip install -e '.[normalization]'`` to enable
+    :func:`normalize_atomic_names`.
     """
     if name == "normalize_atomic_names":
         from .bpmn_normalization import normalize_atomic_names as _fn

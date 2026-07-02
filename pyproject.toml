@@ -16,34 +16,27 @@ priority = "primary"
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
 pydantic = "^2.13.4"
-lxml = "^6.0.2"
 sentence-transformers = {version = "^4.1.0", optional = true}
-scikit-learn = {version = "^1.6.1", optional = true}
 marimo = {version = "^0.13", optional = true}
 plotly = {version = "^5.24.0", optional = true}
 pandas = {version = "^2.2.3", optional = true}
 matplotlib = {version = "^3.10.7", optional = true}
-ipywidgets = {version = "^8.1.8", optional = true}
 ipykernel = {version = "^6.29.5", optional = true}
-nbformat = {version = "^5.10.0", optional = true}
+nbformat = {version = "^5.10.4", optional = true}
 
 [tool.poetry.extras]
-normalization = ["sentence-transformers", "scikit-learn"]
+normalization = ["sentence-transformers"]
 dashboard = [
     "marimo",
     "plotly",
     "pandas",
     "matplotlib",
-    "ipywidgets",
     "ipykernel",
     "nbformat",
 ]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
-
-sentence-transformers = "^4.1.0"
-scikit-learn = "^1.6.1"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
