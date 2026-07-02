@@ -14,17 +14,6 @@ name = "PyPI"
 priority = "primary"
 
 
-[[tool.poetry.source]]
-name = "sap"
-url = "https://int.repositories.cloud.sap/artifactory/api/pypi/build-snapshots-pypi/simple"
-priority = "supplemental"
-
-
-[[tool.poetry.source]]
-name = "signavio"
-url = "https://common.repositories.cloud.sap/artifactory/api/pypi/signavio-pypi/simple"
-priority = "explicit"
-
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
 pydantic = "^2.13.4"
