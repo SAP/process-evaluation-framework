@@ -19,7 +19,7 @@ score without crashing?"). Split of concerns:
                  in ``[0, 1]`` (or ``None``) without raising.
 
 Both files load the same two BPMN fixtures
-(``examples/old_models/and_gateway_with_join.bpmn`` and
+(``examples/testing_models/petri_soundness/and_gateway_with_join.bpmn`` and
 ``and_gateway_no_join.bpmn``). The rest are hand-built here.
 
 Coverage phases (matches the original refactor plan comments):
@@ -57,7 +57,7 @@ from model_evaluation.petri import (
 )
 
 
-EXAMPLES = Path(__file__).resolve().parent.parent.parent / "examples" / "old_models"
+EXAMPLES = Path(__file__).resolve().parent.parent.parent / "examples" / "testing_models" / "petri_soundness"
 
 
 # ---------------------------------------------------------------------------

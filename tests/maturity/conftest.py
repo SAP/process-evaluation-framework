@@ -17,11 +17,11 @@ from model_evaluation import load_bpmn as _load  # re-exported for tests
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 
-# All maturity fixtures live under examples/maturity/<category>/. Category
-# constants are exposed so individual test files don't have to repeat the
-# path joining (and so a folder rename touches one line).
+# All maturity fixtures live under examples/testing_models/<category>/.
+# Category constants are exposed so individual test files don't have to
+# repeat the path joining (and so a folder rename touches one line).
 EXAMPLES = _ROOT / "examples"
-MATURITY = EXAMPLES / "maturity"
+MATURITY = EXAMPLES / "testing_models"
 SANITY = MATURITY / "sanity"
 FORMAT_ROUND_TRIP = MATURITY / "format_round_trip"
 DEGENERATE = MATURITY / "degenerate"

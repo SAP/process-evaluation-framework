@@ -1,6 +1,6 @@
 """Sanity / boundary cases for the maturity suite.
 
-Three cases (all fixtures under ``examples/maturity/sanity/``):
+Three cases (all fixtures under ``examples/testing_models/sanity/``):
 
 - ``identical``     — model compared to itself; every sub-score ≥ 0.95.
 - ``disjoint``      — two completely unrelated models; overall ≤ 0.15.

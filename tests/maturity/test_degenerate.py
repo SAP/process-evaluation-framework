@@ -1,6 +1,6 @@
 """Degenerate-input handling for the maturity suite.
 
-Four cases (all fixtures under ``examples/maturity/degenerate/``):
+Four cases (all fixtures under ``examples/testing_models/degenerate/``):
 
 - ``unsound_vs_sound``  — ``unsound_and_no_join.bpmn`` (AND-split with
   no join, deadlocks) compared to ``sound_and_with_join.bpmn`` must
