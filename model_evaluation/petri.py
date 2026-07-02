@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from model_evaluation.json_to_pn import parse_simplified_bpmn_json, get_bpmn_element_type, is_bpmn_element_relevant_for_pn, is_bpmn_choice_gateway, get_direct_preset_bpmn_ids, get_direct_postset_bpmn_ids, BpmnElementType
+from .json_to_pn import parse_simplified_bpmn_json, get_bpmn_element_type, is_bpmn_element_relevant_for_pn, is_bpmn_choice_gateway, get_direct_preset_bpmn_ids, get_direct_postset_bpmn_ids, BpmnElementType
 
 
 class SoundnessStatus(str, Enum):

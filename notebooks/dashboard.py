@@ -20,34 +20,27 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _imports():
-    # Imports + sys.path shim.
-    #
-    # Mirrors ``notebooks/model_eval_code_usage.ipynb`` cell 1 so the bare
-    # imports (``from bpmn_similarity import ...``) work whether marimo is
-    # started from the repo root or from ``notebooks/``.
     import base64
-    import sys
     from pathlib import Path
 
     import marimo as mo
     import plotly.graph_objects as go
 
-    _here = Path(__file__).resolve().parent
-    _repo_root = _here.parent
-    for _p in (str(_repo_root), str(_repo_root / "model_evaluation")):
-        if _p not in sys.path:
-            sys.path.insert(0, _p)
-
-    from bpmn_normalization import normalize_atomic_names
-    from bpmn_similarity import (
+    from model_evaluation import (
+        BPMNConverter,
+        XMLBPMNConverter,
         calculate_bpmn_similarity,
         calculate_hybrid_similarity,
         calculate_ngram_similarity,
         calculate_trace_similarity,
+        extract_ngrams,
+        extract_traces,
+        normalize_atomic_names,
     )
-    from model_evaluation.BPMN_conversion import BPMNConverter, XMLBPMNConverter
-    from trace_extraction import extract_ngrams, extract_traces
-    from utils.string_similarity import cosine_sim_optimized
+    from model_evaluation.utils.string_similarity import cosine_sim_optimized
+
+    _here = Path(__file__).resolve().parent
+    _repo_root = _here.parent
 
     CATEGORY_COLORS = {
         "elements": "#3498db",        # Blue

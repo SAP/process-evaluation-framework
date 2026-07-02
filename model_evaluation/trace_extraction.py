@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple, Union
 
-from petri import (
+from .petri import (
     ExplorationDiagnostics,
     PetriNet,
     SEVERE_STRUCTURAL_ISSUES,
@@ -82,7 +82,7 @@ def __getattr__(name):
     at module load time (``bpmn_similarity`` imports from this module).
     """
     if name == "calculate_trace_similarity":
-        from bpmn_similarity import calculate_trace_similarity as _cts
+        from .bpmn_similarity import calculate_trace_similarity as _cts
         return _cts
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -262,7 +262,7 @@ def compare_trace_sets(
     # Lazy import: ``calculate_trace_similarity`` lives in ``bpmn_similarity``,
     # which itself imports from this module. Importing it here keeps the
     # top-level dependency one-way (bpmn_similarity → trace_extraction).
-    from bpmn_similarity import calculate_ngram_similarity, calculate_trace_similarity
+    from .bpmn_similarity import calculate_ngram_similarity, calculate_trace_similarity
 
     list_1 = _coerce_to_trace_list(traces_1)
     list_2 = _coerce_to_trace_list(traces_2)

@@ -21,11 +21,11 @@ import math
 
 import pytest
 
-from bpmn_similarity import (
+from model_evaluation import (
     calculate_bpmn_similarity,
     calculate_trace_similarity,
+    extract_traces,
 )
-from trace_extraction import extract_traces
 
 from .conftest import DEGENERATE, _load
 

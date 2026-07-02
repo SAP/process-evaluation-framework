@@ -14,9 +14,9 @@
 
 from typing import List, Union, Literal
 
-from bpmn_sets import extract_bpmn_sets
-from trace_extraction import TraceExtractionResult, extract_ngrams, extract_traces
-from utils.list_similarity import dice_list, index_list, jaccard_list, overlap_list, scores
+from .bpmn_sets import extract_bpmn_sets
+from .trace_extraction import TraceExtractionResult, extract_ngrams, extract_traces
+from .utils.list_similarity import dice_list, index_list, jaccard_list, overlap_list, scores
 
 # Public type alias: most similarity helpers accept either raw traces or a
 # TraceExtractionResult.
