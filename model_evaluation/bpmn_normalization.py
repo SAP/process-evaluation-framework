@@ -2,9 +2,9 @@
 BPMN Semantic Normalization
 
 This module provides functions for semantically aligning BPMN model element names
-using string similarity measures (e.g., BERT embeddings). This is an optional
-preprocessing step that can improve similarity calculations when comparing models
-with similar but not identical naming conventions.
+using string similarity measures (e.g., BERT embeddings). This preprocessing step
+can improve similarity calculations when comparing models with similar but not
+identical naming conventions.
 
 Type fields (activity types, event types, gateway types) are NOT normalized here;
 they are canonicalized deterministically at the conversion boundary
