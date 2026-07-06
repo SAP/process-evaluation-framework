@@ -10,7 +10,7 @@ This repository provides a framework for evaluating and comparing BPMN process m
 
 1. **Load models** — import BPMN models from BPMN 2.0 XML or Signavio JSON.
 2. **Convert** — transform them into a minimal BPMN representation.
-3. **Normalize** *(optional)* — align element names semantically using a sentence-transformer model (e.g., "Book flight" ↔ "Book a flight").
+3. **Normalize** — align element names semantically using a sentence-transformer model (e.g., "Book flight" ↔ "Book a flight").
 4. **Extract traces** — convert to Petri nets and extract execution traces / variants to analyze behavioral similarity.
 5. **Calculate similarity** — compute structural, flow, organizational, subprocess, and trace similarity scores.
 6. **Visualize** — explore results in an interactive dashboard with adjustable weights and metrics (Dice, Jaccard, Precision, Recall, F1).
@@ -27,19 +27,15 @@ The framework supports pools, lanes, message flows, subprocesses, and provides d
 The evaluation logic is packaged as an importable Python library. Install it from the repository root:
 
 ```bash
-poetry install                         # core only — enough for structural + trace + hybrid similarity
-poetry install --extras normalization  # adds semantic name alignment (pulls sentence-transformers / torch)
-poetry install --extras dashboard      # adds the marimo dashboard + notebook deps
-poetry install --all-extras            # everything
+poetry install                     # installs the full library (structural + trace + hybrid + normalization)
+poetry install --extras dashboard  # adds the marimo dashboard + notebook deps
 ```
 
 Equivalent with pip:
 
 ```bash
 pip install -e .
-pip install -e '.[normalization]'
 pip install -e '.[dashboard]'
-pip install -e '.[normalization,dashboard]'
 ```
 
 ## Quick start
@@ -64,7 +60,7 @@ hybrid = calculate_hybrid_similarity(structural, behavioral, structural_weight=0
 print(f"structural={structural['overall']:.2f}  behavioral={behavioral:.2f}  hybrid={hybrid['hybrid']:.2f}")
 ```
 
-`normalize_atomic_names` is available when the `normalization` extra is installed; calling it without the extra raises a clear `ImportError`.
+`normalize_atomic_names` performs semantic name alignment via a sentence-transformer model and is part of the standard public API.
 
 **Input format.** All similarity and trace functions accept the same internal *minimal BPMN JSON* object with keys `activities`, `events`, `gateways`, `pools`, `sequenceFlows`, and `messageFlows` — see `model_evaluation/bpmn_schema.py` for the full JSON Schema. `load_bpmn_xml` / `load_signavio_json` produce this format from a file on disk; if you already have parsed XML / JSON in memory, use `XMLBPMNConverter.convert(xml_string).to_dict()` or `BPMNConverter.convert(parsed_dict).to_dict()` directly.
 
@@ -75,7 +71,7 @@ For a guided tour of the full API, open `notebooks/library_walkthrough.ipynb`.
 The interactive similarity dashboard is a [marimo](https://marimo.io) notebook. Launch it from the repo root:
 
 ```bash
-poetry run marimo edit notebooks/dashboard.py
+poetry run marimo run notebooks/dashboard.py
 ```
 
 It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view. Use `marimo run` instead of `edit` for a read-only app view.
@@ -88,7 +84,7 @@ model_evaluation/               # Importable library
 │   ├── string_similarity.py    # BERT-based semantic similarity
 │   └── list_similarity.py      # Set comparison metrics (Dice, Jaccard, etc.)
 ├── bpmn_conversion.py          # Signavio JSON and BPMN 2.0 XML → minimal BPMN converter
-├── bpmn_normalization.py       # Semantic name alignment (optional extra)
+├── bpmn_normalization.py       # Semantic name alignment
 ├── bpmn_schema.py              # JSON Schema for the minimal BPMN format
 ├── bpmn_sets.py                # Element set extraction
 ├── bpmn_similarity.py          # Similarity calculation engine

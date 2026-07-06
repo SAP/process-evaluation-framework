@@ -12,6 +12,7 @@ Typical usage::
         calculate_trace_similarity,
         calculate_hybrid_similarity,
         extract_traces,
+        normalize_atomic_names,
     )
 
     m1 = load_bpmn_xml("process1.bpmn")
@@ -24,13 +25,13 @@ Typical usage::
         structural, behavioral, structural_weight=0.5
     )
 
-Semantic name alignment (``normalize_atomic_names``) requires the optional
-``[normalization]`` extra — install with ``pip install -e '.[normalization]'``
-to pull ``sentence-transformers``.
+``normalize_atomic_names`` performs semantic name alignment via a
+sentence-transformer model and is part of the standard public API.
 """
 
 from ._loaders import load_bpmn, load_bpmn_xml, load_signavio_json
 from .bpmn_conversion import BPMNConverter, XMLBPMNConverter
+from .bpmn_normalization import normalize_atomic_names
 from .bpmn_sets import extract_bpmn_sets
 from .bpmn_similarity import (
     calculate_bpmn_similarity,
@@ -44,19 +45,6 @@ from .trace_extraction import (
     extract_ngrams,
     extract_traces,
 )
-
-
-def __getattr__(name):
-    """Lazily expose optional-extra symbols so importing this package does not
-    pull in ``sentence-transformers`` unless the caller actually reaches for
-    them. Install with ``pip install -e '.[normalization]'`` to enable
-    :func:`normalize_atomic_names`.
-    """
-    if name == "normalize_atomic_names":
-        from .bpmn_normalization import normalize_atomic_names as _fn
-        return _fn
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 __all__ = [
     # Loaders
@@ -78,6 +66,6 @@ __all__ = [
     "extract_traces",
     # Structural sets
     "extract_bpmn_sets",
-    # Optional (requires [normalization] extra)
+    # Semantic name alignment
     "normalize_atomic_names",
 ]
