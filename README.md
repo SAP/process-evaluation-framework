@@ -6,9 +6,6 @@
 
 This repository provides a framework for evaluating and comparing BPMN process models using structural, behavioral, and semantic similarity metrics. Alongside a structural similarity score it reports a trace-based behavioral score and a hybrid score that combines the two.
 
-![Two BPMN process variants](docs/img/sample-models.png)
-*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic.*
-
 **Evaluation pipeline:**
 
 1. **Load models** — import BPMN models from BPMN 2.0 XML or Signavio JSON.
@@ -79,7 +76,16 @@ poetry run marimo run notebooks/dashboard.py
 
 It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view.
 
+The dashboard is preloaded with two Purchase-to-Pay (P2P) variants — the same running example used in our submitted demo paper on this prototype. They are small enough to inspect at a glance, yet exercise a variety of features the framework handles: pools and lanes, subprocesses, an exclusive-gateway approval branch, and paraphrased activity labels (e.g. "Book flight" vs. "Book a flight") that only match after semantic normalization.
+
+![Two BPMN process variants](docs/img/sample-models.png)
+
+*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic. BPMN models are rendered using [bpmn.io](https://bpmn.io).*
+
+The dashboard then reports how similar the two models are along three complementary axes — structural, behavioral, and a weighted hybrid — with every score re-computed live as you change the metric (Dice, Jaccard, Precision, Recall, F1), category weights, or the structural/behavioral mix.
+
 ![Similarity dashboard](docs/img/dashboard.png)
+
 *The dashboard: structural similarity (left) with element-level breakdown and weighted contributions; behavioral similarity (top-right) with trace/n-gram comparison; hybrid similarity (bottom-right) combining the two with an adjustable weight.*
 
 ## Project structure
