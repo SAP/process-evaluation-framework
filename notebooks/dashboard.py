@@ -470,58 +470,13 @@ def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
 
 
 @app.cell
-def _bpmn_iframe_helper(base64):
-    # Embed bpmn-js in a sandboxed iframe so the BPMN XML renders inside the
-    # dashboard. Returns the HTML string so marimo can capture it directly.
-    _viewer_script = (
-        "https://unpkg.com/bpmn-js@17.11.1/dist/"
-        "bpmn-navigated-viewer.production.min.js"
-    )
-    _html_template = (
-        "<!DOCTYPE html>"
-        "<html>"
-        "<head>"
-        '<meta charset="UTF-8">'
-        '<script src="__VIEWER__"></script>'
-        "<style>"
-        "html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; background: #ffffff; }"
-        "#canvas { width: 100%; height: 100%; }"
-        "#error { color: red; padding: 20px; display: none; }"
-        "</style>"
-        "</head>"
-        "<body>"
-        '<div id="error"></div>'
-        '<div id="canvas"></div>'
-        "<script>"
-        "var xml = `__XML__`;"
-        "window.addEventListener('load', function() {"
-        "  var viewer = new BpmnJS({ container: document.getElementById('canvas') });"
-        "  viewer.importXML(xml).then(function() {"
-        "    var canvas = viewer.get('canvas');"
-        "    canvas.zoom('fit-viewport', 'auto');"
-        "  }).catch(function(err) {"
-        "    document.getElementById('error').style.display = 'block';"
-        "    document.getElementById('error').textContent = 'Error: ' + err.message;"
-        "  });"
-        "});"
-        "</script>"
-        "</body>"
-        "</html>"
-    )
+def _bpmn_iframe_helper():
+    # Shared bpmn-js iframe builder — lives in the library so the walkthrough
+    # notebook and the dashboard render diagrams the exact same way.
+    from model_evaluation.rendering import build_bpmn_iframe_html
 
     def bpmn_iframe(xml_str, height_px=320):
-        safe_xml = xml_str.replace("`", "'")
-        html_doc = _html_template.replace("__VIEWER__", _viewer_script).replace(
-            "__XML__", safe_xml
-        )
-        html_b64 = base64.b64encode(html_doc.encode("utf-8")).decode("utf-8")
-        return (
-            "<iframe src=\"data:text/html;base64,"
-            + html_b64
-            + "\" width=\"100%\" height=\""
-            + str(height_px)
-            + "px\" frameborder=\"0\" style=\"border-radius:8px;\"></iframe>"
-        )
+        return build_bpmn_iframe_html(xml_str, height_px=height_px)
 
     return (bpmn_iframe,)
 

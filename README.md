@@ -74,7 +74,19 @@ The interactive similarity dashboard is a [marimo](https://marimo.io) notebook. 
 poetry run marimo run notebooks/dashboard.py
 ```
 
-It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view. Use `marimo run` instead of `edit` for a read-only app view.
+It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view.
+
+The dashboard is preloaded with two Purchase-to-Pay (P2P) variants — the same running example used in our submitted demo paper on this prototype. They are small enough to inspect at a glance, yet exercise a variety of features the framework handles: pools and lanes, subprocesses, an exclusive-gateway approval branch, and paraphrased activity labels (e.g. "Book flight" vs. "Book a flight") that only match after semantic normalization.
+
+![Two BPMN process variants](docs/img/sample-models.png)
+
+*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic. BPMN diagrams in the dashboard and the walkthrough notebook are rendered by the shared `model_evaluation.rendering` helper, which embeds [bpmn-js](https://github.com/bpmn-io/bpmn-js) in a sandboxed iframe.*
+
+The dashboard then reports how similar the two models are along three complementary axes — structural, behavioral, and a weighted hybrid — with every score re-computed live as you change the metric (Dice, Jaccard, Precision, Recall, F1), category weights, or the structural/behavioral mix.
+
+![Similarity dashboard](docs/img/dashboard.png)
+
+*The dashboard: structural similarity (left) with element-level breakdown and weighted contributions; behavioral similarity (top-right) with trace/n-gram comparison; hybrid similarity (bottom-right) combining the two with an adjustable weight.*
 
 ## Project structure
 
@@ -91,7 +103,8 @@ model_evaluation/               # Importable library
 ├── json_to_pn.py               # Minimal BPMN → Petri-net flow structure
 ├── petri.py                    # Petri net data structures and helpers
 ├── trace_extraction.py         # Trace / variant extraction via Petri nets
-└── sapsam_mapping.py           # SAP-specific mappings
+├── sapsam_mapping.py           # SAP-specific mappings
+└── rendering/                  # bpmn-js iframe viewer (used by dashboard + notebook)
 
 notebooks/
 ├── dashboard.py                # Interactive similarity dashboard (marimo)
