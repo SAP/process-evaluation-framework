@@ -6,6 +6,9 @@
 
 This repository provides a framework for evaluating and comparing BPMN process models using structural, behavioral, and semantic similarity metrics. Alongside a structural similarity score it reports a trace-based behavioral score and a hybrid score that combines the two.
 
+![Two BPMN process variants](docs/img/sample-models.png)
+*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic.*
+
 **Evaluation pipeline:**
 
 1. **Load models** — import BPMN models from BPMN 2.0 XML or Signavio JSON.
@@ -74,7 +77,10 @@ The interactive similarity dashboard is a [marimo](https://marimo.io) notebook. 
 poetry run marimo run notebooks/dashboard.py
 ```
 
-It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view. Use `marimo run` instead of `edit` for a read-only app view.
+It bundles the structural, behavioral (with n-gram subpanel), and hybrid sections into one reactive view.
+
+![Similarity dashboard](docs/img/dashboard.png)
+*The dashboard: structural similarity (left) with element-level breakdown and weighted contributions; behavioral similarity (top-right) with trace/n-gram comparison; hybrid similarity (bottom-right) combining the two with an adjustable weight.*
 
 ## Project structure
 
