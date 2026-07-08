@@ -80,7 +80,7 @@ The dashboard is preloaded with two Purchase-to-Pay (P2P) variants — the same 
 
 ![Two BPMN process variants](docs/img/sample-models.png)
 
-*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic. BPMN models are rendered using [bpmn.io](https://bpmn.io).*
+*Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic. BPMN diagrams in the dashboard and the walkthrough notebook are rendered by the shared `model_evaluation.rendering` helper, which embeds [bpmn-js](https://github.com/bpmn-io/bpmn-js) in a sandboxed iframe.*
 
 The dashboard then reports how similar the two models are along three complementary axes — structural, behavioral, and a weighted hybrid — with every score re-computed live as you change the metric (Dice, Jaccard, Precision, Recall, F1), category weights, or the structural/behavioral mix.
 
@@ -103,7 +103,8 @@ model_evaluation/               # Importable library
 ├── json_to_pn.py               # Minimal BPMN → Petri-net flow structure
 ├── petri.py                    # Petri net data structures and helpers
 ├── trace_extraction.py         # Trace / variant extraction via Petri nets
-└── sapsam_mapping.py           # SAP-specific mappings
+├── sapsam_mapping.py           # SAP-specific mappings
+└── rendering/                  # bpmn-js iframe viewer (used by dashboard + notebook)
 
 notebooks/
 ├── dashboard.py                # Interactive similarity dashboard (marimo)
