@@ -1075,16 +1075,27 @@ def _fig_weighted_contributions(
     # element-level breakdown chart.
     _missing = [lbl for lbl, p in zip(_labels, _present_flags) if not p]
     if _missing:
-        _fig.add_bar(
-            orientation="h",
-            y=_missing,
-            x=[_xlim] * len(_missing),
-            marker_color=NO_DATA_COLOR,
-            opacity=0.6,
-            showlegend=False,
-            hoverinfo="skip",
-        )
+        # Draw the banner as a shape rectangle rather than an extra bar trace:
+        # under barmode="group" a third bar would be squeezed into its own
+        # narrow sub-slot instead of filling the row. Shapes are laid out
+        # independently of barmode, and category-axis y0shift / y1shift let us
+        # span exactly one full row without manual index arithmetic.
         for _lbl in _missing:
+            _fig.add_shape(
+                type="rect",
+                xref="x",
+                yref="y",
+                x0=0,
+                x1=_xlim,
+                y0=_lbl,
+                y1=_lbl,
+                y0shift=-0.5,
+                y1shift=0.5,
+                fillcolor=NO_DATA_COLOR,
+                opacity=0.6,
+                line=dict(width=0),
+                layer="above",
+            )
             _fig.add_annotation(
                 x=_xlim / 2,
                 y=_lbl,
