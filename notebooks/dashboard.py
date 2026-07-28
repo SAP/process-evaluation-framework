@@ -170,6 +170,8 @@ def _theme(mo):
     .pe-stale { background: #fff7ed; border: 1px solid #fed7aa;
         color: #9a3412; padding: 8px 12px; border-radius: 8px;
         font-size: 13px; margin-bottom: 10px; }
+    .pe-slot-disabled { opacity: 0.5; pointer-events: none;
+        filter: grayscale(0.4); }
     .pe-muted { color: #64748b; font-size: 13px; }
     .pe-diag { background: #f8fafc; border: 1px solid #eef0f3;
         border-radius: 8px; padding: 10px 12px; font-family: ui-monospace,
@@ -364,7 +366,11 @@ def _bpmn_options(EXAMPLES_DIR):
     # Flag for the downstream cards: when the user only has one model
     # file in examples/, both dropdowns default to it. We surface a
     # banner instead of silently comparing a model with itself (which
-    # yields a misleading 100% similarity).
+    # yields a misleading 100% similarity). Uploads (see
+    # ``_slot_uploaders``) live per-slot and don't participate in this
+    # count — a user who uploads for one slot can still pick a distinct
+    # built-in for the other, and the same-file guard in ``_load_models``
+    # catches the pathological cases.
     only_one_file = len(_keys) < 2
     return bpmn_options, default_1, default_2, only_one_file
 
@@ -387,25 +393,83 @@ def _model_pickers(bpmn_options, default_1, default_2, mo):
 
 
 @app.cell
-def _models_card(card, mo, model1_dd, model2_dd, only_one_file):
-    # Lay the two dropdowns side-by-side (equal-width columns, small gap)
-    # so they each span half the card with a touch of breathing room on
-    # the outer edges. ``full_width=True`` on the dropdowns themselves
-    # makes them stretch to fill their column.
+def _slot_uploaders(mo):
+    # Session-only upload per model slot. Each widget's ``.value``
+    # replaces on every new drop (marimo's file widget does not
+    # accumulate), so having two independent widgets — one per slot —
+    # is what makes "compare my model against yours" work: users just
+    # drop the two files into the two slots.
     #
-    # When the user only has one model file in examples/, prepend a
-    # warning banner so they don't mistake the resulting self-comparison
-    # for a real result. The downstream ``_load_models`` cell also
-    # refuses to proceed when both dropdowns point at the same file.
-    _body = [mo.hstack([model1_dd, model2_dd], widths="equal", gap=1)]
+    # When a slot has an uploaded file, ``_load_models`` treats the
+    # upload as the source of truth for that slot and ignores the
+    # dropdown selection. Marimo's file widget has its own clear
+    # affordance, so falling back to the dropdown is a click away.
+    #
+    # ``multiple=False`` keeps this to one file per slot, matching the
+    # one-model-per-slot mental model. Contents live only in the
+    # widget's ``.value`` and are dropped on browser refresh / server
+    # restart — see ``_load_models`` for the trade-off note.
+    _kwargs = dict(
+        filetypes=[".bpmn", ".xml", ".json"],
+        multiple=False,
+        kind="area",
+    )
+    upload1 = mo.ui.file(
+        **_kwargs, label="…or drop your own for Model 1"
+    )
+    upload2 = mo.ui.file(
+        **_kwargs, label="…or drop your own for Model 2"
+    )
+    return upload1, upload2
+
+
+@app.cell
+def _models_card(card, mo, model1_dd, model2_dd, only_one_file, upload1, upload2):
+    # Each slot is a vertical stack of "dropdown, then uploader". The
+    # two stacks then sit side-by-side (equal-width columns, small gap)
+    # so each slot occupies half the card. ``full_width=True`` on the
+    # dropdowns and the uploaders' natural full-width behavior make
+    # them fill their column.
+    #
+    # UX contract: within a slot, the uploader wins over the dropdown
+    # when it has a value. That way "drop your own" is a one-action
+    # commit — the user doesn't have to also change the dropdown. See
+    # ``_load_models`` for the resolution logic.
+    #
+    # When a slot has an active upload we visually grey out the paired
+    # dropdown (marimo doesn't support ``disabled=`` on dropdowns, so
+    # we lean on a CSS class ``pe-slot-disabled`` defined in _theme
+    # and marimo's documented widget-in-f-string interpolation for
+    # ``mo.Html``). Clearing the upload via marimo's native "Click to
+    # clear files." link auto-reverses the greyed state on the next
+    # render — no manual reset needed.
+    #
+    # When the user only has one built-in model file in examples/,
+    # prepend a warning banner. Uploads don't participate in that
+    # count (they're not selectable from the dropdown), but the
+    # same-file guard in ``_load_models`` still catches accidental
+    # self-comparison.
+    def _slot(dropdown, uploader):
+        if uploader.value:
+            filename = uploader.value[0].name
+            greyed_dd = mo.Html(
+                f"<div class='pe-slot-disabled'>{dropdown}</div>"
+            )
+            filename_line = mo.md(f"**Uploaded:** `{filename}`")
+            return mo.vstack([greyed_dd, uploader, filename_line], gap=0.5)
+        return mo.vstack([dropdown, uploader], gap=0.5)
+
+    _left = _slot(model1_dd, upload1)
+    _right = _slot(model2_dd, upload2)
+    _body = [mo.hstack([_left, _right], widths="equal", gap=1)]
     if only_one_file:
         _body.insert(
             0,
             mo.Html(
                 "<div class='pe-stale'>"
                 "Only one model file found in <code>examples/</code> — "
-                "add a second file (or pick different ones below) to "
-                "compare two distinct models."
+                "add a second file, pick a different one below, or drop "
+                "your own into a slot to compare two distinct models."
                 "</div>"
             ),
         )
@@ -413,59 +477,119 @@ def _models_card(card, mo, model1_dd, model2_dd, only_one_file):
         "Models",
         mo.vstack(_body, gap=0.8),
         info=(
-            "Pick the two BPMN files to compare. Changing either model "
-            "re-runs every section below."
+            "Pick a built-in file from each dropdown, or drop your own "
+            "BPMN / Signavio JSON into the area below a dropdown. An "
+            "upload wins over the dropdown for that slot. Changing "
+            "either model re-runs every section below."
         ),
     )
     return
 
 
 @app.cell
-def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd):
-    # Parse the two selected model files into the minimal-BPMN dicts.
+def _load_models(BPMNConverter, XMLBPMNConverter, mo, model1_dd, model2_dd, upload1, upload2):
+    # Resolve each slot independently to a minimal-BPMN dict + optional
+    # raw XML string. Priority within a slot:
     #
-    # Supports both BPMN 2.0 XML (.bpmn/.xml) and Signavio JSON (.json),
-    # dispatched on suffix — mirrors the canonical ``load_model``
-    # pattern documented in ``notebooks/library_walkthrough.ipynb``.
-    # Both converters land in the same dict shape so everything
-    # downstream is format-agnostic.
+    #   1. If the slot's uploader has a file, parse and use it.
+    #      Failures for one slot never affect the other's resolution.
+    #   2. Otherwise, load the file the dropdown points at from disk
+    #      (existing behavior).
     #
-    # Reactivity: re-runs whenever either dropdown changes. The XML
-    # strings are kept around for the BPMN preview iframes below — for
-    # JSON files xml1/xml2 stay None and the preview cell renders a
-    # stub instead.
+    # Same-file guard: compare an (kind, ident) tuple across slots so
+    # an upload with the same bytes as a built-in still trips the
+    # "pick two different files" check. ident_for_upload is a sha256
+    # of the file contents (cheap enough for BPMN-sized files);
+    # ident_for_disk is the absolute path.
     #
-    # Stop conditions:
-    #  - either dropdown empty (initial render before defaults resolve,
-    #    or no model files in examples/);
-    #  - both dropdowns pointing at the same file (would silently
-    #    produce a 100%-identical "comparison").
-    mo.stop(
-        not (model1_dd.value and model2_dd.value),
-        mo.md("_Pick two model files above to load the models._"),
-    )
-    mo.stop(
-        model1_dd.value == model2_dd.value,
-        mo.md("_Pick two **different** model files to compare._"),
-    )
-
+    # Error propagation: on a per-slot parse failure, we ``mo.stop``
+    # here with a message naming the offending slot and the reason.
+    # Downstream cells (preview, similarity) don't run, but the
+    # dashboard as a whole stays alive — the user can drop a
+    # replacement file into that slot without touching the other.
+    #
+    # Security note: xml.etree.ElementTree (used by XMLBPMNConverter)
+    # disables external-entity expansion by default since Python 3.7.1,
+    # so no extra hardening is needed for in-memory parsing.
+    import hashlib as _hashlib
     import json as _json
     from pathlib import Path as _Path
 
-    def _load_one(path_str):
+    def _parse_upload(f):
+        # Raises on failure — the caller catches and wraps the message.
+        suffix = _Path(f.name).suffix.lower()
+        if suffix in (".bpmn", ".xml"):
+            xml = f.contents.decode("utf-8")
+            return XMLBPMNConverter.convert(xml).to_dict(), xml
+        if suffix == ".json":
+            raw = _json.loads(f.contents.decode("utf-8"))
+            return BPMNConverter.convert(raw).to_dict(), None
+        raise ValueError(f"unsupported extension: {suffix!r}")
+
+    def _load_disk(path_str):
         path = _Path(path_str)
         if path.suffix.lower() in (".bpmn", ".xml"):
             return (
                 XMLBPMNConverter.convert_file(path_str).to_dict(),
                 path.read_text(encoding="utf-8"),
             )
-        # Signavio JSON path — no XML preview available.
         with open(path_str, "r", encoding="utf-8") as fh:
             raw = _json.load(fh)
         return BPMNConverter.convert(raw).to_dict(), None
 
-    model_1_json, xml1 = _load_one(model1_dd.value)
-    model_2_json, xml2 = _load_one(model2_dd.value)
+    def _resolve(upload_widget, dropdown_value):
+        # Returns (model_dict, xml_or_None, (kind, ident), err_or_None).
+        if upload_widget.value:
+            f = upload_widget.value[0]
+            try:
+                model, xml = _parse_upload(f)
+            except UnicodeDecodeError:
+                return None, None, None, (
+                    f"`{f.name}` is not valid UTF-8 text — try re-saving as UTF-8."
+                )
+            except Exception as e:  # noqa: BLE001 — surfaces parser errors to the UI
+                msg = f"`{f.name}`: {type(e).__name__}: {e}"
+                if len(msg) > 220:
+                    msg = msg[:217] + "..."
+                return None, None, None, msg
+            ident = ("upload", _hashlib.sha256(f.contents).hexdigest())
+            return model, xml, ident, None
+        model, xml = _load_disk(dropdown_value)
+        return model, xml, ("disk", dropdown_value), None
+
+    # Stop conditions on the dropdowns themselves (upload can rescue
+    # an empty dropdown value, so only halt when BOTH the dropdown
+    # AND the uploader for a slot are empty).
+    _slot1_empty = not model1_dd.value and not upload1.value
+    _slot2_empty = not model2_dd.value and not upload2.value
+    mo.stop(
+        _slot1_empty or _slot2_empty,
+        mo.md("_Pick a model file (or upload one) for each slot._"),
+    )
+
+    model_1_json, xml1, ident1, err1 = _resolve(upload1, model1_dd.value)
+    model_2_json, xml2, ident2, err2 = _resolve(upload2, model2_dd.value)
+
+    if err1 or err2:
+        _lines = []
+        if err1:
+            _lines.append(f"- **Model 1:** {err1}")
+        if err2:
+            _lines.append(f"- **Model 2:** {err2}")
+        mo.stop(
+            True,
+            mo.md(
+                "**Couldn't parse your upload(s):**\n\n"
+                + "\n".join(_lines)
+                + "\n\nDrop a different file into that slot to continue."
+            ),
+        )
+
+    mo.stop(
+        ident1 == ident2,
+        mo.md("_Pick two **different** model files to compare._"),
+    )
+
     return model_1_json, model_2_json, xml1, xml2
 
 
@@ -951,16 +1075,27 @@ def _fig_weighted_contributions(
     # element-level breakdown chart.
     _missing = [lbl for lbl, p in zip(_labels, _present_flags) if not p]
     if _missing:
-        _fig.add_bar(
-            orientation="h",
-            y=_missing,
-            x=[_xlim] * len(_missing),
-            marker_color=NO_DATA_COLOR,
-            opacity=0.6,
-            showlegend=False,
-            hoverinfo="skip",
-        )
+        # Draw the banner as a shape rectangle rather than an extra bar trace:
+        # under barmode="group" a third bar would be squeezed into its own
+        # narrow sub-slot instead of filling the row. Shapes are laid out
+        # independently of barmode, and category-axis y0shift / y1shift let us
+        # span exactly one full row without manual index arithmetic.
         for _lbl in _missing:
+            _fig.add_shape(
+                type="rect",
+                xref="x",
+                yref="y",
+                x0=0,
+                x1=_xlim,
+                y0=_lbl,
+                y1=_lbl,
+                y0shift=-0.5,
+                y1shift=0.5,
+                fillcolor=NO_DATA_COLOR,
+                opacity=0.6,
+                line=dict(width=0),
+                layer="above",
+            )
             _fig.add_annotation(
                 x=_xlim / 2,
                 y=_lbl,
