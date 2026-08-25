@@ -142,7 +142,7 @@ EMPTY_MODEL = _minimal()
 # its two arguments. ``precision`` and ``recall`` are deliberately
 # excluded — they're asymmetric by definition and swapping arguments
 # swaps their roles (see ``test_precision_of_ab_equals_recall_of_ba``).
-SYMMETRIC_METHODS = ("dice", "jaccard", "overlap", "f1")
+SYMMETRIC_METHODS = ("dice", "jaccard", "overlap")
 ALL_METHODS = SYMMETRIC_METHODS + ("precision", "recall")
 
 
@@ -162,7 +162,7 @@ def test_bpmn_self_similarity_is_one(method):
 
 @pytest.mark.parametrize("method", SYMMETRIC_METHODS)
 def test_bpmn_symmetry_for_symmetric_methods(method):
-    """dice / jaccard / overlap / f1 must produce the same overall
+    """dice / jaccard / overlap must produce the same overall
     regardless of argument order. If this drifts, an asymmetry has crept
     into the extraction or grouping layer."""
     ab = calculate_bpmn_similarity(MODEL_A, MODEL_B, method=method)["overall"]
@@ -278,7 +278,7 @@ def test_bpmn_result_shape_has_expected_keys():
 # calculate_trace_similarity — invariants
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("method", ("dice", "jaccard", "overlap", "f1"))
+@pytest.mark.parametrize("method", ("dice", "jaccard", "overlap"))
 def test_trace_self_similarity_is_one(method):
     traces = [["A", "B", "C"], ["A", "D"]]
     assert calculate_trace_similarity(traces, traces, method=method) == pytest.approx(1.0)

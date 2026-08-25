@@ -197,28 +197,25 @@ def test_overlap_list_is_symmetric():
 # ---------------------------------------------------------------------------
 # scores — precision / recall / F1 (asymmetric: list_1 is ground truth)
 # ---------------------------------------------------------------------------
-# Precision = |A ∩ B| / |B|,   Recall = |A ∩ B| / |A|,
-# F1 = 2·P·R / (P + R)
+# Precision = |A ∩ B| / |B|,   Recall = |A ∩ B| / |A|
 # The docstring names list_1 the ground truth, so precision measures
 # "how many of B's elements are correct" and recall "how many of A's
 # elements were retrieved".
 
 @pytest.mark.parametrize(
-    "a, b, prec, rec, f1",
+    "a, b, prec, rec",
     [
-        (*IDENTICAL, 1.0, 1.0, 1.0),
-        (*DISJOINT, 0.0, 0.0, 0),              # f1 short-circuits to 0
-        (*SUBSET, 1.0, 2.0 / 3.0, 0.8),        # every b∈B is in A; A has one extra
-        (*ONE_OVERLAP, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0),
+        (*IDENTICAL, 1.0, 1.0),
+        (*DISJOINT, 0.0, 0.0),
+        (*SUBSET, 1.0, 2.0 / 3.0),
+        (*ONE_OVERLAP, 1.0 / 3.0, 1.0 / 3.0),
     ],
 )
-def test_scores_truth_table(a, b, prec, rec, f1):
+def test_scores_truth_table(a, b, prec, rec):
     p, _ = scores(a, b, "precision")
     r, _ = scores(a, b, "recall")
-    f, _ = scores(a, b, "f1")
     assert p == pytest.approx(prec)
     assert r == pytest.approx(rec)
-    assert f == pytest.approx(f1)
 
 
 def test_scores_precision_of_ab_equals_recall_of_ba():
@@ -241,14 +238,6 @@ def test_scores_both_empty_returns_zero_zero():
     dice/jaccard/overlap instead."""
     assert scores([], [], "precision") == (0, 0)
     assert scores([], [], "recall") == (0, 0)
-    assert scores([], [], "f1") == (0, 0)
-
-
-def test_scores_f1_is_zero_when_precision_plus_recall_is_zero():
-    """Explicit guard in the source; pin so a refactor can't remove it
-    and hand back a NaN or ZeroDivisionError."""
-    f, _ = scores(*DISJOINT, "f1")
-    assert f == 0
 
 
 def test_scores_rejects_unknown_type():
@@ -272,16 +261,6 @@ def test_jaccard_le_dice_le_overlap_for_nonempty_sets(a, b):
     assert d <= o + 1e-12
 
 
-@pytest.mark.parametrize("a, b", [IDENTICAL, DISJOINT, SUBSET, ONE_OVERLAP])
-def test_dice_equals_f1_for_symmetric_case(a, b):
-    """Well-known identity: Dice coefficient over two sets equals the F1
-    score when precision and recall are computed set-wise. Pinning this
-    lets a refactorer discover if either implementation drifts."""
-    d, _ = dice_list(a, b)
-    f, _ = scores(a, b, "f1")
-    assert d == pytest.approx(f)
-
-
 @pytest.mark.parametrize(
     "a, b",
     [IDENTICAL, DISJOINT, SUBSET, ONE_OVERLAP],
@@ -295,4 +274,3 @@ def test_self_similarity_is_one(a, b):
         assert helper(a, a)[0] == 1.0
     assert scores(a, a, "precision")[0] == 1.0
     assert scores(a, a, "recall")[0] == 1.0
-    assert scores(a, a, "f1")[0] == 1.0

@@ -57,7 +57,7 @@ def overlap_list(list1, list2):
 
 
 def scores(list_1, list_2, score_type="precision"):
-    """list_1 is the ground truth, list_2 is the generated list"""
+    """list_1 is the ground truth, list_2 is the generated list. Computes precision and recall."""
     # Convert lists to sets
     set1, set2 = set(list_1), set(list_2)
 
@@ -72,20 +72,13 @@ def scores(list_1, list_2, score_type="precision"):
     weight = (
         (2 * len(set1) * len(set2)) / (len(set1) + len(set2)) if (len(set1) + len(set2)) != 0 else 0
     )
-    # Calculate the F1 score
-    if precision + recall == 0:
-        f1 = 0  # To handle the case when both precision and recall are zero
-    else:
-        f1 = 2 * (precision * recall) / (precision + recall)
 
     if score_type == "precision":
         return precision, weight  # len(set1) + len(set2)
     elif score_type == "recall":
         return recall, weight  # len(set1) + len(set2)
-    elif score_type == "f1":
-        return f1, weight  # len(set1) + len(set2)
     else:
-        raise ValueError("Invalid score type. Use 'precision', 'recall', or 'f1'.")
+        raise ValueError("Invalid score type. Use 'precision' or 'recall'.")
 
 
 

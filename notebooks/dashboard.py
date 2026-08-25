@@ -665,7 +665,6 @@ def _global_controls(mo):
             "Overlap": "overlap",
             "Precision": "precision",
             "Recall": "recall",
-            "F1": "f1",
         },
         value="Dice",
         label="Set-comparison metric",
@@ -721,8 +720,6 @@ def _global_card(card, metric_radio, mo, name_mappings, normalization_summary_ht
             "that also appear in Model 1.</li>"
             "<li><strong>Recall</strong>: share of Model 1 items "
             "recovered by Model 2.</li>"
-            "<li><strong>F1</strong>: harmonic mean of precision and "
-            "recall.</li>"
             "</ul>"
         ),
     )
