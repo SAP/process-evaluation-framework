@@ -62,7 +62,7 @@ def calculate_trace_similarity(
         traces_2: Second set of traces, or a :class:`TraceExtractionResult`.
         method: Similarity metric – ``"jaccard"`` (default), ``"dice"``,
             ``"overlap"`` (overlap coefficient), or ``"precision"`` /
-            ``"recall"`` / ``"f1"`` (computed over the deduped trace sets,
+            ``"recall"`` (computed over the deduped trace sets,
             with ``traces_1`` treated as ground truth).
 
     Returns:
@@ -96,7 +96,7 @@ def calculate_trace_similarity(
     elif method == "overlap":
         score, _ = overlap_list(set_1, set_2)
         return score
-    elif method in {"precision", "recall", "f1"}:
+    elif method in {"precision", "recall"}:
         score, _ = scores(set_1, set_2, score_type=method)
         return score
     else:
@@ -107,7 +107,7 @@ def calculate_ngram_similarity(
     traces_1: TracesOrResult,
     traces_2: TracesOrResult,
     n: int = 2,
-    method: Literal["jaccard", "dice", "overlap", "precision", "recall", "f1"] = "jaccard",
+    method: Literal["jaccard", "dice", "overlap", "precision", "recall"] = "jaccard",
     pad: bool = True,
 ) -> float:
     """Set-based n-gram similarity between two trace collections.
@@ -140,7 +140,7 @@ def calculate_ngram_similarity(
     elif method == "overlap":
         score, _ = overlap_list(ngrams_1, ngrams_2)
         return score
-    elif method in {"precision", "recall", "f1"}:
+    elif method in {"precision", "recall"}:
         score, _ = scores(ngrams_1, ngrams_2, score_type=method)
         return score
     else:
@@ -202,7 +202,7 @@ def calculate_bpmn_similarity(
             fine_scores[key] = jaccard_list(l1, l2)[0]
         elif method == "overlap":
             fine_scores[key] = overlap_list(l1, l2)[0]
-        elif method in {"precision", "recall", "f1"}:
+        elif method in {"precision", "recall"}:
             fine_scores[key] = scores(l1, l2, score_type=method)[0]
         else:
             raise ValueError("Unsupported method")

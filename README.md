@@ -13,7 +13,7 @@ This repository provides a framework for evaluating and comparing BPMN process m
 3. **Normalize** — align element names semantically using a sentence-transformer model (e.g., "Book flight" ↔ "Book a flight").
 4. **Extract traces** — convert to Petri nets and extract execution traces / variants to analyze behavioral similarity.
 5. **Calculate similarity** — compute structural, flow, organizational, subprocess, and trace similarity scores.
-6. **Visualize** — explore results in an interactive dashboard with adjustable weights and metrics (Dice, Jaccard, Precision, Recall, F1).
+6. **Visualize** — explore results in an interactive dashboard with adjustable weights and metrics (Dice, Jaccard, Overlap, Precision, Recall).
 
 The framework supports pools, lanes, message flows, subprocesses, and provides detailed element-level breakdowns with configurable category weights.
 
@@ -82,7 +82,7 @@ The dashboard is preloaded with two Purchase-to-Pay (P2P) variants — the same 
 
 *Two P2P process variants the framework compares — same high-level flow, different approval branches, lane names, and matching logic. BPMN diagrams in the dashboard and the walkthrough notebook are rendered by the shared `model_evaluation.rendering` helper, which embeds [bpmn-js](https://github.com/bpmn-io/bpmn-js) in a sandboxed iframe.*
 
-The dashboard then reports how similar the two models are along three complementary axes — structural, behavioral, and a weighted hybrid — with every score re-computed live as you change the metric (Dice, Jaccard, Precision, Recall, F1), category weights, or the structural/behavioral mix.
+The dashboard then reports how similar the two models are along three complementary axes — structural, behavioral, and a weighted hybrid — with every score re-computed live as you change the metric (Dice, Jaccard, Overlap, Precision, Recall), category weights, or the structural/behavioral mix.
 
 ![Similarity dashboard](docs/img/dashboard.png)
 
